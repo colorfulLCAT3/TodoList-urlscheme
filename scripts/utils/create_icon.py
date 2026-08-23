@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""
+创建TodoList应用图标
+如果没有PIL库，可以跳过此步骤
+"""
+import sys
+import os
+import subprocess
+import tempfile
+
+try:
+    from PIL import Image, ImageDraw
+
+    def create_icon(padding_ratio=0.1):
+        """创建一个简单的TodoList图标"""
+        # 创建256x256的图像
+        size = 256
+        img = Image.new('RGBA', (size, size), None)
+        draw = ImageDraw.Draw(img)
+
+        # 计算有效绘图区域（留白）
+        pad = int(size * padding_ratio)
+        left, top = pad, pad
+        right, bottom = size - pad, size - pad
+        inner_size = right - left
+
+        # 1. 蓝色背景圆角矩形（缩进 pad 像素）
+        draw.rounded_rectangle(
+            [left, top, right, bottom],
+            fill=(0, 123, 255, 255),
+            radius=int(inner_size * 0.15)
+        )
+
+        # 2. 白色复选框（大小调整为内框的一半）
+        box_size = int(inner_size * 0.5)  # 原来为 size * 0.5
+        box_x = left + (inner_size - box_size) // 2
+        box_y = top + (inner_size - box_size) // 2
+        draw.rounded_rectangle(
+            [box_x, box_y, box_x + box_size, box_y + box_size],
+            fill='white', outline='white',
+            width=3, radius=int(box_size * 0.15)
+        )
+
+        # 3. 对勾（坐标重新计算，保持相对位置）
+        line_width = max(8, int(box_size * 0.12))  # 自适应线宽
+        color = (0, 123, 255)
+
+        # 第一段：左下到中间
+        x1 = box_x + int(box_size * 0.27)
+        y1 = box_y + int(box_size * 0.55)
+        x2 = box_x + int(box_size * 0.43)
+        y2 = box_y + int(box_size * 0.73)
+
+        # 第二段：中间到右上
+        x3 = box_x + int(box_size * 0.77)
+        y3 = box_y + int(box_size * 0.35)
+
+        draw_line_with_round_caps(draw, x1, y1, x2, y2, line_width, color)
+        draw_line_with_round_caps(draw, x2, y2, x3, y3, line_width, color)
+
+        # --- 根据平台保存不同格式的图标 ---
+        if sys.platform == 'darwin':
+            # 在 macOS 上生成 .icns 文件
+            _save_macos_icns(img)
+        else:
+            # 其他系统保持原有的 .ico 生成方式
+            img.save('todo_icon.ico', format='ICO',
+                     sizes=[(256 * 8, 256 * 8), (128 * 8, 128 * 8), (64 * 8, 64 * 8), (48 * 8, 48 * 8), (32 * 8, 32 * 8),
+                        (16 * 8, 16 * 8)])
+        print("✅ 图标创建成功: todo_icon.ico")
+
+        preview_size = (256, 256)
+        preview_img = img.resize(preview_size, Image.Resampling.LANCZOS)
+        preview_img.save('todo_icon.png', format='PNG')
+
+    def _save_macos_icns(img):
+        """将图标保存为 macOS 的 .icns 文件"""
+        # 标准 macOS 图标所需尺寸（1x 与 2x）
+        sizes = {
+            'icon_16x16.png': 16,
+            'icon_16x16@2x.png': 32,
+            'icon_32x32.png': 32,
+            'icon_32x32@2x.png': 64,
+            'icon_128x128.png': 128,
+            'icon_128x128@2x.png': 256,
+            'icon_256x256.png': 256,
+            'icon_256x256@2x.png': 512,
+            'icon_512x512.png': 512,
+            'icon_512x512@2x.png': 1024,
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            iconset = os.path.join(tmpdir, 'todo_icon.iconset')
+            os.makedirs(iconset, exist_ok=True)
+
+            for filename, size_px in sizes.items():
+                resized = img.resize((size_px, size_px), Image.Resampling.LANCZOS)
+                resized.save(os.path.join(iconset, filename))
+
+            # 调用系统的 iconutil 生成 .icns
+            try:
+                subprocess.run(
+                    ['iconutil', '-c', 'icns', iconset, '-o', 'todo_icon.icns'],
+                    check=True, capture_output=True
+                )
+                print("✅ 图标创建成功: todo_icon.icns")
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                print("⚠️  iconutil 调用失败，回退为保存 1024x1024 的 PNG 图标: todo_icon.png")
+                fallback = img.resize((1024, 1024), Image.Resampling.LANCZOS)
+                fallback.save('todo_icon.png', format='PNG')
+
+    def draw_line_with_round_caps(draw, x1, y1, x2, y2, width, color):
+        """绘制带圆头的线段"""
+        import math
+
+        # 计算线段的角度和长度
+        dx = x2 - x1
+        dy = y2 - y1
+        length = math.sqrt(dx * dx + dy * dy)
+
+        if length == 0:
+            return
+
+        # 单位方向向量
+        ux = dx / length
+        uy = dy / length
+
+        # 垂直向量
+        px = -uy
+        py = ux
+
+        # 半宽
+        hw = width / 2
+
+        # 矩形的四个角点
+        corners = [
+            (x1 + px * hw, y1 + py * hw),
+            (x1 - px * hw, y1 - py * hw),
+            (x2 - px * hw, y2 - py * hw),
+            (x2 + px * hw, y2 + py * hw),
+        ]
+
+        # 绘制矩形主体
+        draw.polygon(corners, fill=color)
+
+        # 在两端绘制圆形端点
+        draw.ellipse([x1 - hw, y1 - hw, x1 + hw, y1 + hw], fill=color)
+        draw.ellipse([x2 - hw, y2 - hw, x2 + hw, y2 + hw], fill=color)
+
+    if __name__ == '__main__':
+        create_icon()
+
+except ImportError:
+    print("⚠️  未安装PIL库，跳过图标创建")
+    print("如需创建图标，请运行: pip install Pillow")
+except Exception as e:
+    print(f"❌ 创建图标失败: {e}")

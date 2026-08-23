@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoList URL Scheme 测试页</title>
+    <style>
+        :root {
+            --bg-page: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            --card-bg: #ffffff;
+            --card-border: #e5e7eb;
+            --text-main: #1f2937;
+            --text-sub: #6b7280;
+            --label: #374151;
+            --input-bg: #f9fafb;
+            --input-border: #d1d5db;
+            --input-focus: #3b82f6;
+            --note-bg: #eff6ff;
+            --note-border: #3b82f6;
+            --note-text: #1e40af;
+            --code-bg: #0f172a;
+            --code-text: #7dd3fc;
+            --btn-primary: #3b82f6;
+            --btn-secondary: #6b7280;
+            --status: #059669;
+        }
+
+        html[data-theme="dark"] {
+            --bg-page: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+            --card-bg: #1a1a1a;
+            --card-border: #333;
+            --text-main: #e5e7eb;
+            --text-sub: #9ca3af;
+            --label: #d1d5db;
+            --input-bg: #222;
+            --input-border: #404040;
+            --input-focus: #60a5fa;
+            --note-bg: #1e293b;
+            --note-border: #60a5fa;
+            --note-text: #93c5fd;
+            --code-bg: #000;
+            --code-text: #7dd3fc;
+            --btn-primary: #3b82f6;
+            --btn-secondary: #4b5563;
+            --status: #34d399;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+            background: var(--bg-page);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: background .3s;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+            max-width: 640px;
+            width: 100%;
+            padding: 28px 32px;
+            transition: background .3s, border-color .3s;
+        }
+        .head-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        h1 { font-size: 22px; margin: 0 0 6px; color: var(--text-main); }
+        .sub { color: var(--text-sub); font-size: 13px; margin: 0 0 20px; }
+        .theme-toggle {
+            border: 1px solid var(--input-border);
+            background: var(--input-bg);
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            flex-shrink: 0;
+            transition: background .2s, border-color .2s;
+        }
+        .theme-toggle:hover { border-color: var(--input-focus); }
+        label { display: block; font-size: 13px; font-weight: 600; color: var(--label); margin: 14px 0 4px; }
+        input[type="text"], textarea, select, input[type="datetime-local"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            background: var(--input-bg);
+            color: var(--text-main);
+            transition: border-color .15s;
+        }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: var(--input-focus); background: var(--card-bg); }
+        textarea { min-height: 96px; resize: vertical; }
+        .row { display: flex; gap: 10px; }
+        .row > div { flex: 1; }
+        .btn {
+            display: inline-block;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #fff;
+            margin-top: 18px;
+            transition: transform .1s, opacity .15s;
+        }
+        .btn:hover { opacity: .92; }
+        .btn:active { transform: scale(.98); }
+        .btn.primary { background: var(--btn-primary); width: 100%; }
+        .btn.secondary { background: var(--btn-secondary); }
+        .preview {
+            margin-top: 14px;
+            background: var(--code-bg);
+            color: var(--code-text);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 11px;
+            word-break: break-all;
+            white-space: pre-wrap;
+            max-height: 110px;
+            overflow-y: auto;
+            display: none;
+        }
+        .note {
+            background: var(--note-bg);
+            border-left: 4px solid var(--note-border);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            color: var(--note-text);
+            margin-top: 14px;
+            line-height: 1.6;
+        }
+        .status { margin-top: 10px; font-size: 13px; color: var(--status); min-height: 18px; }
+        .tag { display: inline-block; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 4px; padding: 0 4px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="head-row">
+            <div>
+                <h1>📝 TodoList URL Scheme 测试</h1>
+                <p class="sub">从网页唤起 TodoList 应用并推送待办。需先启动应用一次以完成注册。</p>
+            </div>
+            <button class="theme-toggle" id="theme-toggle" title="切换夜间模式">🌙</button>
+        </div>
+
+        <label for="title">任务标题（必填）</label>
+        <input type="text" id="title" value="测试任务：买牛奶" placeholder="例如：写季度总结">
+
+        <div class="row">
+            <div>
+                <label for="priority">优先级</label>
+                <select id="priority">
+                    <option value="none">无</option>
+                    <option value="low">低</option>
+                    <option value="medium">中</option>
+                    <option value="high">高</option>
+                </select>
+            </div>
+            <div>
+                <label for="completed">完成状态</label>
+                <select id="completed">
+                    <option value="false">未完成</option>
+                    <option value="true">已完成</option>
+                </select>
+            </div>
+        </div>
+
+        <label for="category_id">分类 ID（可选，需与库内分类一致）</label>
+        <input type="text" id="category_id" placeholder="例如：不填则无分类">
+
+        <label for="due_date">开始日期时间（可选）</label>
+        <input type="datetime-local" id="due_date" value="">
+
+        <label for="description">备注（可选，支持 <span class="tag">**加粗**</span> 和换行）</label>
+        <textarea id="description" placeholder="任务补充说明，可用 **重点** 加粗..."></textarea>
+
+        <button class="btn primary" id="launch">🚀 唤起应用并导入</button>
+
+        <div class="preview" id="preview"></div>
+        <div class="status" id="status"></div>
+
+        <div class="note">
+            <strong>预置示例：</strong>点击下方按钮可一次性推送多个任务（多任务 JSON 数组）。<br>
+            <button class="btn secondary" id="multi">推送 3 个示例任务</button><br>
+            <br>
+            <strong>协议格式：</strong><code>todolist://add?data=&lt;urlencode(JSON)&gt;</code><br>
+            支持：任务数组 <code>[{...}]</code>、单个对象 <code>{...}</code>、<code>{"tasks":[...]}</code>。
+        </div>
+    </div>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+
+        // ---------- 夜间模式 ----------
+        const themeBtn = $('theme-toggle');
+        const savedTheme = localStorage.getItem('test_page_theme') || 'light';
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            themeBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+            localStorage.setItem('test_page_theme', theme);
+        }
+        applyTheme(savedTheme);
+        themeBtn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            applyTheme(current === 'dark' ? 'light' : 'dark');
+        });
+
+        // ---------- URL 推送 ----------
+        function buildSingle() {
+            const task = {
+                title: $('title').value.trim() || '未命名任务',
+                description: $('description').value.trim(),
+                completed: $('completed').value === 'true',
+                priority: $('priority').value,
+            };
+            if ($('category_id').value.trim()) task.category_id = $('category_id').value.trim();
+            if ($('due_date').value) task.due_date = $('due_date').value.replace('T', ' ');
+            return task;
+        }
+
+        function buildMulti() {
+            return [
+                { title: '高优先级示例', description: '来自测试页 **重点** 任务', completed: false, priority: 'high', due_date: '2027-01-01 09:00' },
+                { title: '已完成示例', description: '已完成', completed: true, priority: 'medium' },
+                { title: '普通示例', description: '默认无优先级无分类', priority: 'none' },
+            ];
+        }
+
+        function makeUrl(payload) {
+            const json = JSON.stringify(payload);
+            return 'todolist://add?data=' + encodeURIComponent(json);
+        }
+
+        function showPreview(url) {
+            const el = $('preview');
+            el.style.display = 'block';
+            el.textContent = url;
+        }
+
+        function launch(url) {
+            showPreview(url);
+            $('status').textContent = '已尝试唤起应用，请查看 TodoList 是否弹出提示...';
+            // 用一个隐藏 iframe 触发自定义协议（比 location 更稳，避免页面跳转）
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = url;
+            document.body.appendChild(iframe);
+            setTimeout(() => iframe.remove(), 1500);
+        }
+
+        $('launch').addEventListener('click', () => launch(makeUrl(buildSingle())));
+        $('multi').addEventListener('click', () => launch(makeUrl(buildMulti())));
+    </script>
+</body>
+</html>

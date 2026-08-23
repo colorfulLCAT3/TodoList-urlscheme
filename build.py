@@ -9,14 +9,24 @@ import shutil
 import subprocess
 from pathlib import Path
 
+# Windows 控制台默认 GBK 编码，强制 stdout/stderr 使用 UTF-8，
+# 避免 print 输出 emoji/中文时出现 UnicodeEncodeError
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 def create_icon():
     """创建应用图标"""
     print("🎨 创建应用图标...")
-    
+
     try:
         # 尝试运行图标创建脚本
+        # 注意：Windows 控制台默认 GBK 编码，子进程输出需用 errors='replace' 避免 UnicodeDecodeError
         result = subprocess.run([sys.executable, Path(os.path.dirname(__file__), "scripts", "utils", 'create_icon.py')],
-                                capture_output=True, text=True, encoding='utf-8')
+                                capture_output=True, text=True, encoding='utf-8', errors='replace')
         if result.returncode == 0:
             print("   ✅ 图标创建成功")
             return True
@@ -88,8 +98,9 @@ def build_process():
             print("   使用默认图标")
         
         # 使用PyInstaller构建（不传递icon参数，因为使用spec文件）
+        # 用 python -m PyInstaller 而非裸命令，避免 PATH 中找不到 pyinstaller
         cmd = [
-            'pyinstaller',
+            sys.executable, '-m', 'PyInstaller',
             '--clean',
             '--noconfirm',
             'TodoList.spec'

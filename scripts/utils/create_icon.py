@@ -8,6 +8,15 @@ import os
 import subprocess
 import tempfile
 
+# Windows 控制台默认 GBK 编码，强制 stdout/stderr 使用 UTF-8，
+# 避免父进程以 UTF-8 读取子进程输出时出现 UnicodeDecodeError
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 try:
     from PIL import Image, ImageDraw
 

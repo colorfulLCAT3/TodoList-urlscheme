@@ -37,7 +37,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy,pywebview,bottle,proxy-tools,typing_extensions,cryptography,webdavclient3,lxml==6.0.2,python-dateutil==2.9.0.post0,Pillow,pystray,desktop-notifier,pyjnius,android,jinja2,six
+requirements = python3,kivy,pywebview,bottle,proxy-tools,typing_extensions,cryptography,webdavclient3,lxml==6.0.2,python-dateutil==2.9.0.post0,Pillow,pyjnius,android,jinja2,six
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -334,7 +334,9 @@ android.allow_backup = True
 #p4a.local_recipes =
 
 # (str) Filename to the hook for p4a
-#p4a.hook =
+# 用于在 APK 构建前禁用硬件加速，修复 Android 14/15 上
+# pywebview WebView 与 SDL 渲染线程冲突导致的启动闪退
+p4a.hook = scripts/config/p4a_hook.py
 
 # (str) Bootstrap to use for android builds
 # p4a.bootstrap = sdl2

@@ -69,13 +69,11 @@ class AndroidService(PlatformService):
     def start_url_listener(self, callback):
         """监听 Android 冷启动 intent 与热启动 onNewIntent 传递的 URL"""
         import threading
-        import time
 
         def poll():
             try:
                 from jnius import autoclass
                 PythonActivity = autoclass('org.kivy.android.PythonActivity')
-                TodoActivity = autoclass('com.pywebview.todos.todolist.TodoListActivity')
                 activity = PythonActivity.mActivity
 
                 # 冷启动：读取初始 intent
@@ -90,17 +88,29 @@ class AndroidService(PlatformService):
                 except Exception as e:
                     self.backend_logger().warning(f"[URLScheme] 读取初始 intent 失败: {e}")
 
-                # 热启动：轮询自定义 Activity 静态字段
-                while True:
-                    time.sleep(1)
-                    last = TodoActivity.lastUrl
-                    if last:
-                        TodoActivity.lastUrl = None
-                        self.backend_logger().info(f"[URLScheme] 热启动收到 URL: {last[:120]}")
-                        callback(last)
+                # 热启动：注册 on_new_intent 回调（webview bootstrap 下 Activity 是
+                # PythonActivity，无法用自定义 Activity 捕获，改用 android.activity.bind）
+                try:
+                    from android.activity import bind
+
+                    def on_new_intent(intent):
+                        try:
+                            if intent is not None and intent.getData() is not None:
+                                data = intent.getDataString()
+                                if data:
+                                    self.backend_logger().info(f"[URLScheme] 热启动收到 URL: {data[:120]}")
+                                    callback(data)
+                        except Exception as e:
+                            self.backend_logger().warning(f"[URLScheme] 处理 on_new_intent 失败: {e}")
+
+                    bind(on_new_intent=on_new_intent)
+                    self.backend_logger().info("[URLScheme] 已注册 on_new_intent 回调")
+                except Exception as e:
+                    self.backend_logger().error(f"[URLScheme] 注册 on_new_intent 回调失败: {e}")
             except Exception as e:
                 self.backend_logger().error(f"[URLScheme] Android URL 监听异常: {e}")
 
+        threading.Thread(target=poll, daemon=True).start()
         threading.Thread(target=poll, daemon=True).start()
 
     def dispatch_url_to_running_instance(self, url):

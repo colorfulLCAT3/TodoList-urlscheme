@@ -37,7 +37,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy,pywebview,bottle,proxy-tools,typing_extensions,cryptography,webdavclient3,lxml==6.0.2,python-dateutil==2.9.0.post0,Pillow,pyjnius,android,jinja2,six
+requirements = python3,pywebview,bottle,proxy-tools,typing_extensions,cryptography,webdavclient3,lxml==6.0.2,python-dateutil==2.9.0.post0,Pillow,pyjnius,android,jinja2,six
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -140,11 +140,11 @@ android.ndk_api = 24
 # android.accept_sdk_license = False
 
 # (str) Android entry point, default is ok for Kivy-based app
-android.entrypoint = com.pywebview.todos.todolist.TodoListActivity
+#android.entrypoint = org.kivy.android.PythonActivity
 
 # (str) Full name including package path of the Java class that implements Android Activity
 # use that parameter together with android.entrypoint to set custom Java class instead of PythonActivity
-android.activity_class_name = com.pywebview.todos.todolist.TodoListActivity
+#android.activity_class_name = org.kivy.android.PythonActivity
 
 # (str) Extra xml to write directly inside the <manifest> element of AndroidManifest.xml
 # use that parameter to provide a filename from where to load your custom XML code
@@ -178,7 +178,7 @@ android.add_jars = lib/pywebview-android.jar
 
 # (list) List of Java files to add to the android project (can be java or a
 # directory containing the files)
-android.add_src = scripts/config/android-src
+#android.add_src = scripts/config/android-src
 
 # (list) Android AAR archives to add
 #android.add_aars =
@@ -333,13 +333,10 @@ android.allow_backup = True
 # (str) The directory in which python-for-android should look for your own build recipes (if any)
 #p4a.local_recipes =
 
-# (str) Filename to the hook for p4a
-# 用于在 APK 构建前禁用硬件加速，修复 Android 14/15 上
-# pywebview WebView 与 SDL 渲染线程冲突导致的启动闪退
-p4a.hook = scripts/config/p4a_hook.py
-
 # (str) Bootstrap to use for android builds
-# p4a.bootstrap = sdl2
+# 使用 webview bootstrap（纯 Android WebView，无 SDL/Kivy 渲染），
+# 避免 pywebview 的 WebView 与 SDL GL surface 冲突导致的启动闪退
+p4a.bootstrap = webview
 
 # (int) port number to specify an explicit --port= p4a argument (eg for bootstrap flask)
 #p4a.port =

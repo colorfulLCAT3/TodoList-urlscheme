@@ -352,7 +352,9 @@ p4a.bootstrap = webview
 #p4a.setup_py = false
 
 # (str) extra command line arguments to pass when invoking pythonforandroid.toolchain
-#p4a.extra_args =
+# 强制从依赖图排除 sdl2/sdl3（android recipe 的可选依赖组会选 sdl2 从而拉入 kivy，
+# webview bootstrap 只需要 genericndkbuild）
+p4a.extra_args = --blacklist-requirements sdl2,sdl3
 
 
 

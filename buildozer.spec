@@ -341,6 +341,11 @@ android.allow_backup = True
 # 避免 pywebview 的 WebView 与 SDL GL surface 冲突导致的启动闪退
 p4a.bootstrap = webview
 
+# (str) Filename to the hook for p4a
+# 手动把 pywebview-android.jar 拷到 dist 的 src/main/libs/，
+# 修复 webview bootstrap 下 --add-jar 静默失败导致的 Gradle 报错
+p4a.hook = scripts/config/p4a_hook.py
+
 # (int) port number to specify an explicit --port= p4a argument (eg for bootstrap flask)
 #p4a.port =
 

@@ -12,6 +12,9 @@ package.domain = com.pywebview.todos
 # (str) Source code where the main.py live
 source.dir = .
 
+# (str) Application versioning (method 1)
+version = 0.1
+
 # (list) Source files to include
 source.include_exts = py,png,jpg,kv,atlas
 

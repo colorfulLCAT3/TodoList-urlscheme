@@ -110,8 +110,11 @@ class AndroidService(PlatformService):
     def start_app(self):
         """启动应用的统一接口"""
         from backend import start
-        # 先启动任务提醒服务（阻塞前）
-        self.start_desktop_task_reminder(True)
+        # 先启动任务提醒服务（阻塞前）。失败仅记日志，绝不阻塞/导致应用闪退
+        try:
+            self.start_desktop_task_reminder(True)
+        except Exception as e:
+            self.backend_logger().error(f"启动任务提醒服务失败: {e}")
         # 安卓端需要开启SSL，否则功能无法使用
         start.start_app(True, True)
 

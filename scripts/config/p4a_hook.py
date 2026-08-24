@@ -12,11 +12,21 @@ FORTIFY: pthread_mutex_lock called on a destroyed mutex / SIGABRT）。
 
 
 def before_apk_build(ctx):
-    manifest_path = ctx.build_dir / 'android' / 'AndroidManifest.xml'
+    # p4a 的 ctx 是 ToolchainCL，构建目录在 args.build_dir（即 --storage-dir）
+    build_dir = getattr(ctx, 'build_dir', None)
+    if build_dir is None:
+        build_dir = getattr(ctx.args, 'build_dir', None)
+    if build_dir is None:
+        print('[p4a_hook] 无法确定构建目录，跳过硬件加速禁用')
+        return
+
+    from pathlib import Path
+    build_dir = Path(build_dir)
+    manifest_path = build_dir / 'android' / 'AndroidManifest.xml'
     if not manifest_path.exists():
         # 部分版本 manifest 在别处，尝试递归查找
         import glob
-        matches = glob.glob(str(ctx.build_dir) + '/**/AndroidManifest.xml', recursive=True)
+        matches = glob.glob(str(build_dir) + '/**/AndroidManifest.xml', recursive=True)
         if not matches:
             print('[p4a_hook] 未找到 AndroidManifest.xml，跳过硬件加速禁用')
             return

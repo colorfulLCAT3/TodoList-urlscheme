@@ -104,7 +104,8 @@ android.permissions = android.permission.INTERNET,android.permission.WRITE_EXTER
 android.api = 33
 
 # (int) Minimum API your APK / AAB will support.
-#android.minapi = 21
+# 必须与 android.ndk_api 一致，否则 p4a 报 minsdk/ndk-api mismatch
+android.minapi = 24
 
 # (int) Android SDK version to use
 android.sdk = 33
@@ -113,7 +114,7 @@ android.sdk = 33
 android.ndk = 25b
 
 # (int) Android NDK API to use. This is the minimum API your app will support, it should usually match android.minapi.
-android.ndk_api = 21
+android.ndk_api = 24
 
 # (bool) Use --private data storage (True) or --dir public storage (False)
 #android.private_storage = True

@@ -38,8 +38,6 @@ class MainActivity : AppCompatActivity() {
     private val reminderHandler = Handler(Looper.getMainLooper())
     private val reminderTimer = Timer()
     private val notifiedTaskIds = mutableSetOf<String>()
-    // 每任务上次扫描的剩余分钟数（用于检测跨过提醒档位边界）
-    private val prevRemaining = mutableMapOf<String, Double>()
 
     companion object {
         private const val TAG = "TodoReminder"
@@ -208,54 +206,49 @@ class MainActivity : AppCompatActivity() {
                                     Log.d(TAG, "提醒已关闭，跳过")
                                     return
                                 }
-                                val offsets = parseOffsets(obj.optString("offsets", "30,10,5"))
+                                val offsets = parseOffsets(obj.optString("offsets", "30,10,5")) // 升序，最紧急档位在前
                                 if (offsets.isEmpty()) return
 
                                 val tasks = obj.getJSONArray("tasks")
                                 val now = System.currentTimeMillis()
-                                val minOffset = offsets.min()
                                 Log.d(TAG, "扫描: ${tasks.length()} 任务, offsets=$offsets, 通知权限=${hasNotificationPermission()}")
 
                                 for (i in 0 until tasks.length()) {
                                     val task = tasks.getJSONObject(i)
                                     val id = task.optString("id", "")
                                     if (id.isEmpty()) continue
-                                    if (task.optBoolean("completed", false)) {
-                                        prevRemaining.remove(id)
-                                        continue
-                                    }
+                                    if (task.optBoolean("completed", false)) continue
                                     val due = task.optString("dueDate", "")
                                     if (due.isEmpty()) continue
                                     val dueMs = parseDate(due) ?: continue
                                     val remainMs = dueMs - now
-                                    if (remainMs <= 0) continue
+                                    val title = task.optString("title", "任务")
 
-                                    val remainMin = remainMs / 60000.0
-                                    val prev = prevRemaining[id]
-
-                                    if (prev == null) {
-                                        // 首次见到该任务：进入最小档窗口才补发最小档，否则仅记录
-                                        if (remainMin <= minOffset) {
-                                            val key = id + "_" + minOffset
-                                            if (!notifiedTaskIds.contains(key)) {
-                                                notifiedTaskIds.add(key)
-                                                Log.d(TAG, "补发最小档 $minOffset 分钟: ${task.optString("title")}")
-                                                showReminder(task.optString("title", "任务"), minOffset)
-                                            }
+                                    // 到期提醒：开始时间已到，提醒一次
+                                    if (remainMs <= 0) {
+                                        val dueKey = id + "_due"
+                                        if (!notifiedTaskIds.contains(dueKey)) {
+                                            notifiedTaskIds.add(dueKey)
+                                            Log.d(TAG, "到期提醒: $title")
+                                            showReminder(title, 0, isDue = true)
                                         }
-                                    } else {
-                                        // 剩余时间跨过某档位边界时，发该档位提醒（每档每任务一次）
-                                        for (offset in offsets) {
-                                            val key = id + "_" + offset
-                                            if (notifiedTaskIds.contains(key)) continue
-                                            if (remainMin <= offset && offset < prev) {
-                                                notifiedTaskIds.add(key)
-                                                Log.d(TAG, "触发 $offset 分钟档: ${task.optString("title")}")
-                                                showReminder(task.optString("title", "任务"), offset)
-                                            }
-                                        }
+                                        continue
                                     }
-                                    prevRemaining[id] = remainMin
+
+                                    // 提前提醒：触发"已到提醒时间且未提醒过"的最紧急档位（升序最先命中）
+                                    // 文案显示实际剩余分钟，避免扫描滞后时与真实时间不符
+                                    val remainMin = remainMs / 60000.0
+                                    for (offset in offsets) {
+                                        val targetMs = dueMs - offset * 60_000L
+                                        if (now < targetMs) continue // 该档位还没到提醒时间，看更不紧急的
+                                        val key = id + "_" + offset
+                                        if (notifiedTaskIds.contains(key)) break // 最紧急已到时间档已触发 → 更不紧急的已过期，停止
+                                        notifiedTaskIds.add(key)
+                                        val showMin = Math.round(remainMin).toInt().coerceAtLeast(1)
+                                        Log.d(TAG, "触发 $offset 分钟档(实际剩 $showMin 分钟): $title")
+                                        showReminder(title, showMin)
+                                        break
+                                    }
                                 }
                             } catch (e: Exception) {
                                 Log.e(TAG, "提醒解析失败: ${e.message}", e)
@@ -269,7 +262,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // 解析 "30,10,5" → 降序去重的正整数列表
+    // 解析 "30,10,5" → 升序去重的正整数列表（最紧急档位在前）
     private fun parseOffsets(raw: String): List<Int> {
         return try {
             raw.split(",")
@@ -278,7 +271,7 @@ class MainActivity : AppCompatActivity() {
                 .mapNotNull { it.toIntOrNull() }
                 .filter { it > 0 }
                 .distinct()
-                .sortedDescending()
+                .sorted()
         } catch (e: Exception) {
             emptyList()
         }
@@ -313,10 +306,17 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun showReminder(title: String, offsetMinutes: Int, isTest: Boolean = false) {
-        val minutes = offsetMinutes.coerceAtLeast(1)
-        val notifTitle = if (isTest) "🔔 测试通知" else "📝 任务即将开始"
-        val notifText = if (isTest) "通知通道正常（测试：$title）" else "任务「$title」将在 $minutes 分钟后开始"
+    private fun showReminder(title: String, minutes: Int, isDue: Boolean = false, isTest: Boolean = false) {
+        val notifTitle = when {
+            isTest -> "🔔 测试通知"
+            isDue -> "✅ 任务开始时间到了"
+            else -> "📝 任务即将开始"
+        }
+        val notifText = when {
+            isTest -> "通知通道正常（测试：$title）"
+            isDue -> "任务「$title」开始时间已到，现在开始吧！"
+            else -> "任务「$title」将在 $minutes 分钟后开始"
+        }
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(notifTitle)

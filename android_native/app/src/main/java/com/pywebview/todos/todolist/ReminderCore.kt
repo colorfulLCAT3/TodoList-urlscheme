@@ -206,6 +206,63 @@ object ReminderAlarm {
         }
         ReminderStore.setScheduledCodes(ctx, emptySet())
     }
+
+    /**
+     * App 打开时补发一次"已到提醒时间但未提醒过"的最紧急档位。
+     * 覆盖闹钟因设备重启/系统清理丢失的场景；每任务只发一条，不刷屏。
+     */
+    fun catchUpMissed(ctx: Context) {
+        if (!ReminderStore.getEnabled(ctx)) return
+        val offsets = parseOffsets(ReminderStore.getOffsetsRaw(ctx))
+        if (offsets.isEmpty()) return
+        val tasksJson = ReminderStore.getTasks(ctx) ?: return
+        val now = System.currentTimeMillis()
+        val notified = ReminderStore.notifiedKeys(ctx)
+
+        try {
+            val tasks = JSONArray(tasksJson)
+            for (i in 0 until tasks.length()) {
+                val task = tasks.getJSONObject(i)
+                if (task.optBoolean("completed", false)) continue
+                val due = task.optString("dueDate", "")
+                if (due.isEmpty()) continue
+                val dueMs = parseDate(due) ?: continue
+                val id = task.optString("id", "")
+                if (id.isEmpty()) continue
+                val title = task.optString("title", "任务")
+                val remainMs = dueMs - now
+
+                if (remainMs <= 0) {
+                    // 到期已错过：只补发"过去较短时间内"的到期提醒，避免刷屏历史任务
+                    if (remainMs >= -60 * 60 * 1000L) {
+                        val dueKey = id + "_due"
+                        if (dueKey !in notified) {
+                            if (ReminderNotifier.send(ctx, title, 0, isDue = true)) {
+                                ReminderStore.addNotified(ctx, dueKey)
+                            }
+                        }
+                    }
+                    continue
+                }
+
+                // 提前提醒：找最紧急"已到时间且未发"档位，发"剩 X 分钟"
+                val remainMin = remainMs / 60000.0
+                for (offset in offsets) {
+                    val targetMs = dueMs - offset * 60_000L
+                    if (now < targetMs) continue
+                    val key = id + "_" + offset
+                    if (key in notified) break
+                    val showMin = Math.round(remainMin).toInt().coerceAtLeast(1)
+                    if (ReminderNotifier.send(ctx, title, showMin)) {
+                        ReminderStore.addNotified(ctx, key)
+                    }
+                    break
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "补发失败: ${e.message}")
+        }
+    }
 }
 
 object ReminderNotifier {

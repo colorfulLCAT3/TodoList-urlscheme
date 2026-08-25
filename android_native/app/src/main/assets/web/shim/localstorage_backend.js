@@ -65,6 +65,21 @@
         }
     }
 
+    // 页面加载时一次性同步存量任务 + 提醒配置到原生（精确闹钟需要，升级用户的旧数据也能设闹钟）
+    function syncAllToNative() {
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.syncAll) {
+            try {
+                var enabled = localStorage.getItem('todolist_remind_enabled');
+                var offsets = localStorage.getItem('todolist_remind_offsets');
+                window.TodoNative.syncAll(
+                    JSON.stringify(getTasks()),
+                    enabled === null ? true : enabled === 'true',
+                    offsets === null ? '30,10,5' : offsets
+                );
+            } catch (e) { /* ignore */ }
+        }
+    }
+
     function getCategories() { return load(KEY_CATEGORIES, []); }
     function setCategories(cats) { save(KEY_CATEGORIES, cats); }
 
@@ -472,4 +487,7 @@
     window.pywebview = window.pywebview || {};
     window.pywebview.api = api;
     window.__pywebview_ready = true;
+
+    // 精确闹钟需要镜像数据：页面加载即同步存量任务 + 提醒配置
+    syncAllToNative();
 })();

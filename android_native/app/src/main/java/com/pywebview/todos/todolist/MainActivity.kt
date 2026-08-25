@@ -95,9 +95,9 @@ class MainActivity : AppCompatActivity() {
         // 请求通知权限（Android 13+）
         requestNotificationPermission()
 
-        // 启动前台兜底服务 + 从镜像恢复精确闹钟调度
-        startReminderService()
+        // 完全采用精确闹钟：从镜像恢复调度 + 补发 app 关闭期间错过的提醒
         ReminderAlarm.scheduleAll(this)
+        ReminderAlarm.catchUpMissed(this)
     }
 
     // ---------- URL scheme ----------
@@ -145,19 +145,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startReminderService() {
-        try {
-            val intent = Intent(this, ReminderService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "启动提醒服务失败: ${e.message}")
-        }
-    }
-
     private fun hasNotificationPermission(): Boolean {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
@@ -186,6 +173,18 @@ class MainActivity : AppCompatActivity() {
         fun syncConfig(enabled: Boolean, offsets: String) {
             Log.d(TAG, "syncConfig: enabled=$enabled, offsets=$offsets")
             runOnUiThread {
+                ReminderStore.setEnabled(this@MainActivity, enabled)
+                ReminderStore.setOffsets(this@MainActivity, offsets)
+                ReminderAlarm.scheduleAll(this@MainActivity)
+            }
+        }
+
+        // 页面加载时一次性同步存量任务+配置（升级用户的旧数据也能设闹钟）
+        @JavascriptInterface
+        fun syncAll(tasksJson: String?, enabled: Boolean, offsets: String) {
+            Log.d(TAG, "syncAll: ${tasksJson?.length ?: 0} 字符, enabled=$enabled, offsets=$offsets")
+            runOnUiThread {
+                if (!tasksJson.isNullOrEmpty()) ReminderStore.setTasks(this@MainActivity, tasksJson)
                 ReminderStore.setEnabled(this@MainActivity, enabled)
                 ReminderStore.setOffsets(this@MainActivity, offsets)
                 ReminderAlarm.scheduleAll(this@MainActivity)

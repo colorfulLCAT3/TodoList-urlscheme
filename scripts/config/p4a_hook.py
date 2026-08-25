@@ -49,9 +49,11 @@ def _patch_python_activity():
     if start != -1 and end != -1 and end > start:
         block = src[start:end + len(end_marker)]
         # 替换为：仅创建一个空 layout 并 setContentView，不创建 WebView
+        # 必须保留 String app_root_dir = getAppRoot();（后续 nativeSetenv 用到）
         replacement = (
             '            // [p4a_hook] 已移除 bootstrap 自带的 WebView，'
             '由 pywebview 独占创建\n'
+            '            String app_root_dir = getAppRoot();\n'
             '            mLayout = new AbsoluteLayout(PythonActivity.mActivity);\n'
             '            setContentView(mLayout);'
         )

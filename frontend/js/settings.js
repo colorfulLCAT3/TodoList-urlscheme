@@ -40,6 +40,7 @@ class SettingsUIManager {
         this.debugModeToggle = null;
         this.debugPanel = null;
         this.sendTestNotificationBtn = null;
+        this.sendTestAlarmBtn = null;
         this.getDebugInfoBtn = null;
         this.debugInfoOutput = null;
 
@@ -107,6 +108,7 @@ class SettingsUIManager {
         this.debugModeToggle = document.getElementById('debug-mode-toggle');
         this.debugPanel = document.getElementById('debug-panel');
         this.sendTestNotificationBtn = document.getElementById('send-test-notification');
+        this.sendTestAlarmBtn = document.getElementById('send-test-alarm');
         this.getDebugInfoBtn = document.getElementById('get-debug-info');
         this.debugInfoOutput = document.getElementById('debug-info-output');
 
@@ -167,6 +169,7 @@ class SettingsUIManager {
         // 调试模式事件绑定
         this.debugModeToggle?.addEventListener('change', () => this.toggleDebugMode());
         this.sendTestNotificationBtn?.addEventListener('click', () => this.sendTestNotification());
+        this.sendTestAlarmBtn?.addEventListener('click', () => this.sendTestAlarm());
         this.getDebugInfoBtn?.addEventListener('click', () => this.getDebugInfo());
 
         // 精确闹钟权限事件
@@ -573,7 +576,18 @@ class SettingsUIManager {
         }
     }
 
-    // 获取并展示调试信息（版本/系统/通知权限/提醒配置/任务数据）
+    // 发送测试闹钟（调用原生设一个 5 秒后的系统闹钟，验证 AlarmManager→Receiver 链路）
+    sendTestAlarm() {
+        console.log('[TodoDebug] 点击「发送测试闹钟」');
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.scheduleTestAlarm) {
+            window.TodoNative.scheduleTestAlarm();
+            Utils.showToast('5 秒后应收到测试闹钟通知', 'success');
+        } else {
+            Utils.showToast('仅 Android 原生端可用', 'warning');
+        }
+    }
+
+    // 获取并展示调试信息（版本/系统/通知权限/提醒配置/任务数据/闹钟调度状态）
     async getDebugInfo() {
         console.log('[TodoDebug] 点击「查看调试信息」');
         const lines = [];
@@ -603,6 +617,22 @@ class SettingsUIManager {
         lines.push('--- 提醒配置 ---');
         lines.push(`提醒开关: ${localStorage.getItem('todolist_remind_enabled') ?? '(未设置→默认开启)'}`);
         lines.push(`提醒时间点: ${localStorage.getItem('todolist_remind_offsets') ?? '(未设置→默认30,10,5)'}`);
+
+        // 原生闹钟调度状态（关键：确认镜像有任务、闹钟真的设上了）
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.getScheduleStatus) {
+            try {
+                const s = JSON.parse(window.TodoNative.getScheduleStatus());
+                lines.push('--- 闹钟调度状态 ---');
+                lines.push(`镜像任务: ${s.mirrorTasksLen} 字符 / 已设闹钟: ${s.scheduledCodes} 个`);
+                lines.push(`提醒开关: ${s.enabled} / 档位: ${s.offsets} / 精确: ${s.canScheduleExactAlarms}`);
+                lines.push(s.lastScheduleLog || '(无调度日志)');
+                if (!s.mirrorTasksLen) {
+                    lines.push('⚠️ 镜像无任务！前端 localStorage 未同步到原生，闹钟无法设置');
+                }
+            } catch (e) {
+                lines.push(`调度状态读取失败: ${e.message}`);
+            }
+        }
 
         lines.push('--- 任务数据 ---');
         try {

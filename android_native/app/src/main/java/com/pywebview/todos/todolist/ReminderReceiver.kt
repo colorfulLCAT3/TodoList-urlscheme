@@ -13,13 +13,22 @@ class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("TodoAlarm", "闹钟触发: ${intent.getStringExtra("title")} offset=${intent.getIntExtra("offset", -1)}")
 
+        val offset = intent.getIntExtra("offset", -1)
+
+        // 测试闹钟：直接发一条测试通知，验证 AlarmManager→Receiver→通知 整条链路
+        if (offset == -2) {
+            val t = intent.getStringExtra("title") ?: "测试闹钟"
+            ReminderNotifier.send(context, t, 5, isTest = true)
+            Log.d("TodoAlarm", "测试闹钟已触发，测试通知已发")
+            return
+        }
+
         if (!ReminderStore.getEnabled(context)) {
             Log.d("TodoAlarm", "提醒已关闭，跳过")
             return
         }
 
         val taskId = intent.getStringExtra("taskId") ?: return
-        val offset = intent.getIntExtra("offset", -1)
         val dueMs = intent.getLongExtra("dueMs", 0L)
         val title = intent.getStringExtra("title") ?: "任务"
 

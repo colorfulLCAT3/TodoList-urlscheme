@@ -217,6 +217,33 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // 设一个 5 秒后的真系统闹钟：若收到"测试闹钟"通知，说明 AlarmManager→Receiver 链路通
+        @JavascriptInterface
+        fun scheduleTestAlarm() {
+            Log.d(TAG, "调试: 用户点击「发送测试闹钟」")
+            runOnUiThread {
+                ReminderAlarm.scheduleTestAlarm(this@MainActivity, 5_000L)
+            }
+        }
+
+        // 返回调度诊断状态（镜像任务/档位/闹钟/权限/上次调度日志）
+        @JavascriptInterface
+        fun getScheduleStatus(): String {
+            return try {
+                val info = JSONObject()
+                info.put("mirrorTasksJson", ReminderStore.getTasks(this@MainActivity) ?: "")
+                info.put("mirrorTasksLen", (ReminderStore.getTasks(this@MainActivity)?.length ?: 0))
+                info.put("enabled", ReminderStore.getEnabled(this@MainActivity))
+                info.put("offsets", ReminderStore.getOffsetsRaw(this@MainActivity))
+                info.put("canScheduleExactAlarms", canScheduleExactAlarms())
+                info.put("scheduledCodes", ReminderStore.scheduledCodes(this@MainActivity).size)
+                info.put("lastScheduleLog", ReminderAlarm.lastScheduleLog)
+                info.toString()
+            } catch (e: Exception) {
+                "{\"error\":\"" + (e.message ?: "unknown") + "\"}"
+            }
+        }
+
         @JavascriptInterface
         fun getNativeDebugInfo(): String {
             return try {

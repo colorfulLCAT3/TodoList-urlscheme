@@ -71,6 +71,10 @@ object ReminderStore {
 object ReminderAlarm {
     private const val TAG = "TodoAlarm"
 
+    // ---- 诊断状态（供前端调试面板展示） ----
+    @Volatile var lastScheduleLog: String = "尚未调度"
+        private set
+
     /** 解析 "30,10,5" → 升序去重正整数（最紧急档位在前） */
     fun parseOffsets(raw: String): List<Int> {
         return try {
@@ -115,32 +119,49 @@ object ReminderAlarm {
 
         cancelAll(ctx)
 
-        if (!enabled || offsets.isEmpty() || tasksJson == null) return
+        if (!enabled || offsets.isEmpty() || tasksJson == null) {
+            val why = if (!enabled) "提醒已关闭" else if (offsets.isEmpty()) "档位为空" else "镜像无任务"
+            lastScheduleLog = "$why（tasks=${tasksJson?.length ?: 0} 字符）"
+            Log.d(TAG, "调度跳过: $why")
+            return
+        }
 
         val alarm = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()
         val now = System.currentTimeMillis()
         val scheduled = HashSet<String>()
+        var parsedTasks = 0
+        var skippedNoTime = 0
+        var skippedPast = 0
+        val detail = StringBuilder()
 
         try {
             val tasks = JSONArray(tasksJson)
             for (i in 0 until tasks.length()) {
                 val task = tasks.getJSONObject(i)
-                if (task.optBoolean("completed", false)) continue
-                val due = task.optString("dueDate", "")
-                if (due.isEmpty()) continue
-                val dueMs = parseDate(due) ?: continue
+                val title = task.optString("title", "任务")
                 val id = task.optString("id", "")
                 if (id.isEmpty()) continue
-                val title = task.optString("title", "任务")
+                if (task.optBoolean("completed", false)) continue
+                val due = task.optString("dueDate", "")
+                if (due.isEmpty()) { skippedNoTime++; continue }
+                val dueMs = parseDate(due)
+                if (dueMs == null) {
+                    skippedNoTime++
+                    detail.append("\n  [${title}] dueDate 解析失败: \"$due\"")
+                    continue
+                }
+                parsedTasks++
+                val dueStr = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(dueMs))
 
                 for (offset in offsets) {
                     val targetMs = dueMs - offset * 60_000L
-                    if (targetMs <= now) continue // 已过的档位不设
+                    if (targetMs <= now) { skippedPast++; continue } // 已过的档位不设
                     val code = requestCode(id, offset.toString())
                     val pi = pendingIntent(ctx, code, id, offset, dueMs, title)
                     scheduleOne(alarm, canExact, targetMs, pi)
                     scheduled.add(code.toString())
+                    detail.append("\n  [${title}] 提前${offset}min @ ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(targetMs))}")
                 }
 
                 if (dueMs >= now) {
@@ -148,14 +169,47 @@ object ReminderAlarm {
                     val pi = pendingIntent(ctx, code, id, -1, dueMs, title)
                     scheduleOne(alarm, canExact, dueMs, pi)
                     scheduled.add(code.toString())
+                    detail.append("\n  [${title}] 到期 @ ${dueStr}")
                 }
             }
         } catch (e: Exception) {
+            lastScheduleLog = "调度异常: ${e.message}"
             Log.e(TAG, "调度失败: ${e.message}", e)
+            return
         }
 
         ReminderStore.setScheduledCodes(ctx, scheduled)
-        Log.d(TAG, "调度完成: ${scheduled.size} 个闹钟, 精确=${canExact}, offsets=$offsets")
+        lastScheduleLog = "设了 ${scheduled.size} 个闹钟 | 可解析任务 $parsedTasks | 精确=$canExact | 跳过无时间/过期 $skippedNoTime/$skippedPast" + detail
+        Log.d(TAG, "调度完成: ${scheduled.size} 个闹钟, 精确=$canExact, 任务=$parsedTasks$detail")
+    }
+
+    /** 调试用：设一个 delayMs 后触发的精确闹钟，验证 AlarmManager→Receiver 链路 */
+    fun scheduleTestAlarm(ctx: Context, delayMs: Long) {
+        val alarm = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()
+        val triggerAt = System.currentTimeMillis() + delayMs
+        val pi = PendingIntent.getBroadcast(
+            ctx, 0x0F00F00, // 固定测试 code
+            Intent(ctx, ReminderReceiver::class.java)
+                .putExtra("taskId", "__test__")
+                .putExtra("offset", -2) // -2 表示测试闹钟
+                .putExtra("dueMs", triggerAt)
+                .putExtra("title", "测试闹钟"),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            if (canExact) {
+                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+                Log.d(TAG, "测试闹钟已设（精确），${delayMs / 1000} 秒后触发")
+            } else {
+                alarm.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 60_000L, pi)
+                Log.d(TAG, "测试闹钟已设（非精确窗口），${delayMs / 1000} 秒后触发")
+            }
+            lastScheduleLog = "测试闹钟已设，${delayMs / 1000} 秒后触发（精确=$canExact）"
+        } catch (e: Exception) {
+            lastScheduleLog = "测试闹钟设置失败: ${e.message}"
+            Log.e(TAG, "测试闹钟失败: ${e.message}", e)
+        }
     }
 
     private fun pendingIntent(ctx: Context, code: Int, taskId: String, offset: Int, dueMs: Long, title: String): PendingIntent {

@@ -742,6 +742,28 @@
                     </div>
                 </div>
 
+                <!-- 调试模式（Android 原生端可用） -->
+                <div class="setting-item" id="debug-mode-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">🐞</span>
+                        <span class="setting-text">调试模式</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="debug-mode-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item-config" id="debug-panel" style="display: none;">
+                    <div class="config-item">
+                        <button id="send-test-notification" class="btn btn--primary-color setting-config-btn">发送测试通知</button>
+                        <button id="get-debug-info" class="btn btn--tertiary-color setting-config-btn">查看调试信息</button>
+                    </div>
+                    <div class="config-item">
+                        <label class="data-label">调试信息</label>
+                        <pre id="debug-info-output" style="font-size: 11px; white-space: pre-wrap; word-break: break-all; background: var(--bg-tertiary); padding: 8px; border-radius: 6px; max-height: 200px; overflow: auto; margin: 0;"></pre>
+                    </div>
+                </div>
+
             </div>
 
             <div class="setting-section">

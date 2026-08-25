@@ -14,6 +14,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.webkit.ConsoleMessage
+import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -51,12 +54,26 @@ class MainActivity : AppCompatActivity() {
         // 读取 URL scheme intent（冷启动）
         pendingUrl = intent?.data?.toString()
 
+        // 允许 chrome://inspect 远程调试 WebView（仅调试构建）
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+
         createNotificationChannel()
         webView = WebView(this)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.allowFileAccess = true
         webView.settings.allowContentAccess = true
+
+        // 前端 console.log 转发到 logcat（tag=TodoWeb），配合调试模式排查
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                Log.d("TodoWeb", "console(${consoleMessage.lineNumber()}): ${consoleMessage.message()}")
+                return true
+            }
+        }
+
+        // 原生桥：调试模式按钮 / 获取调试信息
+        webView.addJavascriptInterface(TodoNative(), "TodoNative")
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -197,7 +214,7 @@ class MainActivity : AppCompatActivity() {
                                 val tasks = obj.getJSONArray("tasks")
                                 val now = System.currentTimeMillis()
                                 val minOffset = offsets.min()
-                                Log.d(TAG, "扫描: ${tasks.length()} 任务, offsets=$offsets")
+                                Log.d(TAG, "扫描: ${tasks.length()} 任务, offsets=$offsets, 通知权限=${hasNotificationPermission()}")
 
                                 for (i in 0 until tasks.length()) {
                                     val task = tasks.getJSONObject(i)
@@ -291,23 +308,63 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showReminder(title: String, offsetMinutes: Int) {
+    private fun hasNotificationPermission(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun showReminder(title: String, offsetMinutes: Int, isTest: Boolean = false) {
         val minutes = offsetMinutes.coerceAtLeast(1)
+        val notifTitle = if (isTest) "🔔 测试通知" else "📝 任务即将开始"
+        val notifText = if (isTest) "通知通道正常（测试：$title）" else "任务「$title」将在 $minutes 分钟后开始"
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("📝 任务即将开始")
-            .setContentText("任务「$title」将在 $minutes 分钟后开始")
+            .setContentTitle(notifTitle)
+            .setContentText(notifText)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
 
+        if (!hasNotificationPermission()) {
+            Log.e(TAG, "通知未发送: POST_NOTIFICATIONS 权限未授予！请在系统设置中允许 TodoList 通知")
+            return
+        }
         try {
-            NotificationManagerCompat.from(this).notify(
-                title.hashCode() and 0xFFFFFF,
-                notification
-            )
+            // 测试通知用固定 id，避免与任务通知冲突
+            val id = if (isTest) 999999 else (title.hashCode() and 0xFFFFFF)
+            NotificationManagerCompat.from(this).notify(id, notification)
+            Log.d(TAG, "通知已发送: $notifTitle / $notifText (id=$id)")
         } catch (e: SecurityException) {
-            // 权限未授予，忽略
+            Log.e(TAG, "通知发送失败(SecurityException): 权限被拒或系统通知被关闭", e)
+        }
+    }
+
+    // 调试模式：前端点击"发送测试通知"时调用，直接验证通知通道/权限
+    private inner class TodoNative {
+        @JavascriptInterface
+        fun sendTestNotification(title: String?) {
+            Log.d(TAG, "调试: 用户点击「发送测试通知」")
+            runOnUiThread {
+                showReminder(title ?: "测试通知", 5, isTest = true)
+            }
+        }
+
+        @JavascriptInterface
+        fun getNativeDebugInfo(): String {
+            return try {
+                val info = JSONObject()
+                @Suppress("DEPRECATION")
+                val pkg = packageManager.getPackageInfo(packageName, 0)
+                info.put("versionName", pkg.versionName ?: "?")
+                @Suppress("DEPRECATION")
+                info.put("versionCode", pkg.versionCode)
+                info.put("sdkInt", Build.VERSION.SDK_INT)
+                info.put("hasNotificationPermission", hasNotificationPermission())
+                info.put("notificationPermissionLabel", if (hasNotificationPermission()) "已授予" else "未授予(通知不会弹出!)")
+                info.toString()
+            } catch (e: Exception) {
+                "{\"error\":\"" + (e.message ?: "unknown") + "\"}"
+            }
         }
     }
 

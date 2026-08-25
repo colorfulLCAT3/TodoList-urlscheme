@@ -36,6 +36,13 @@ class SettingsUIManager {
         this.remindOffsetsInput = null;
         this.remindOffsetsApply = null;
 
+        // 调试模式相关元素
+        this.debugModeToggle = null;
+        this.debugPanel = null;
+        this.sendTestNotificationBtn = null;
+        this.getDebugInfoBtn = null;
+        this.debugInfoOutput = null;
+
         // 延迟初始化
         setTimeout(() => this.init(), 100);
     }
@@ -90,6 +97,13 @@ class SettingsUIManager {
         this.remindToggle = document.getElementById('remind-toggle');
         this.remindOffsetsInput = document.getElementById('remind-offsets-input');
         this.remindOffsetsApply = document.getElementById('remind-offsets-apply');
+
+        // 调试模式元素
+        this.debugModeToggle = document.getElementById('debug-mode-toggle');
+        this.debugPanel = document.getElementById('debug-panel');
+        this.sendTestNotificationBtn = document.getElementById('send-test-notification');
+        this.getDebugInfoBtn = document.getElementById('get-debug-info');
+        this.debugInfoOutput = document.getElementById('debug-info-output');
     }
     
     bindEvents() {
@@ -140,6 +154,11 @@ class SettingsUIManager {
         this.remindToggle?.addEventListener('change', () => this.toggleRemind());
         this.remindOffsetsApply?.addEventListener('click', () => this.applyRemindOffsets());
 
+        // 调试模式事件绑定
+        this.debugModeToggle?.addEventListener('change', () => this.toggleDebugMode());
+        this.sendTestNotificationBtn?.addEventListener('click', () => this.sendTestNotification());
+        this.getDebugInfoBtn?.addEventListener('click', () => this.getDebugInfo());
+
         // ESC键关闭
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.modal && this.modal.style.display === 'flex') this.closeModal();
@@ -181,6 +200,9 @@ class SettingsUIManager {
 
         // 更新提前提醒状态
         this.updateRemindState();
+
+        // 初始化调试模式区（Android 原生端）
+        this.initDebugSection();
     }
 
     // 更新语言状态
@@ -473,6 +495,85 @@ class SettingsUIManager {
             },
             onError: (error) => Utils.showToast(window.languageManager.getText('settingsFailed', '设置失败'), 'error')
         });
+    }
+
+    // ---------- 调试模式（Android 原生端） ----------
+
+    // 初始化调试区：原生桥存在才显示；恢复开关与面板状态
+    initDebugSection() {
+        const hasNative = typeof window.TodoNative !== 'undefined';
+        const item = document.getElementById('debug-mode-item');
+        if (item) item.style.display = hasNative ? '' : 'none';
+        if (!hasNative) return;
+
+        const on = localStorage.getItem('todolist_debug_mode') === 'true';
+        if (this.debugModeToggle) this.debugModeToggle.checked = on;
+        if (this.debugPanel) this.debugPanel.style.display = on ? 'block' : 'none';
+    }
+
+    // 切换调试模式开关
+    toggleDebugMode() {
+        const on = !!this.debugModeToggle?.checked;
+        localStorage.setItem('todolist_debug_mode', on.toString());
+        if (this.debugPanel) this.debugPanel.style.display = on ? 'block' : 'none';
+        console.log(`[TodoDebug] 调试模式已${on ? '开启' : '关闭'}`);
+    }
+
+    // 发送测试通知（调用原生桥，直接验证通知通道/权限）
+    sendTestNotification() {
+        console.log('[TodoDebug] 点击「发送测试通知」');
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.sendTestNotification) {
+            window.TodoNative.sendTestNotification('测试通知');
+            Utils.showToast('已发送，请查看通知栏', 'success');
+        } else {
+            console.warn('[TodoDebug] 原生桥不存在，仅在 Android 原生端可用');
+            Utils.showToast('仅 Android 原生端可用', 'warning');
+        }
+    }
+
+    // 获取并展示调试信息（版本/系统/通知权限/提醒配置/任务数据）
+    async getDebugInfo() {
+        console.log('[TodoDebug] 点击「查看调试信息」');
+        const lines = [];
+
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.getNativeDebugInfo) {
+            try {
+                const info = JSON.parse(window.TodoNative.getNativeDebugInfo());
+                lines.push(`app版本: ${info.versionName} (code ${info.versionCode})`);
+                lines.push(`Android SDK: ${info.sdkInt}`);
+                lines.push(`通知权限: ${info.notificationPermissionLabel}`);
+                if (!info.hasNotificationPermission) {
+                    lines.push('⚠️ 未授予通知权限！请在系统设置中允许 TodoList 通知');
+                }
+            } catch (e) {
+                lines.push(`原生信息读取失败: ${e.message}`);
+            }
+        } else {
+            lines.push('运行在浏览器/非原生端，无原生信息');
+        }
+
+        lines.push('--- 提醒配置 ---');
+        lines.push(`提醒开关: ${localStorage.getItem('todolist_remind_enabled') ?? '(未设置→默认开启)'}`);
+        lines.push(`提醒时间点: ${localStorage.getItem('todolist_remind_offsets') ?? '(未设置→默认30,10,5)'}`);
+
+        lines.push('--- 任务数据 ---');
+        try {
+            const tasks = JSON.parse(localStorage.getItem('todolist_tasks') || '[]');
+            const now = new Date();
+            const dueTasks = tasks.filter(t => !t.completed && t.dueDate);
+            lines.push(`共 ${tasks.length} 个任务，${dueTasks.length} 个未完成且有时间`);
+            dueTasks.slice(0, 10).forEach(t => {
+                const remainMin = Math.round((new Date(t.dueDate).getTime() - now.getTime()) / 60000);
+                lines.push(`  ${remainMin}分钟后: ${t.title}`);
+            });
+        } catch (e) {
+            lines.push(`任务解析失败: ${e.message}`);
+        }
+
+        if (this.debugInfoOutput) {
+            this.debugInfoOutput.textContent = lines.join('\n');
+        }
+        lines.forEach(l => console.log('[TodoDebug] ' + l));
     }
 
     // 更新窗口置顶状态
@@ -957,18 +1058,18 @@ class SettingsUIManager {
 // 全局实例
 let settingsManager = null;
 
+function ensureSettingsManager() {
+    if (!settingsManager) {
+        settingsManager = new SettingsUIManager();
+        window.settingsManager = settingsManager;
+    }
+}
+
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', () => {
     // 延迟初始化，确保所有脚本都加载完成
-    setTimeout(() => {
-        if (!settingsManager) settingsManager = new SettingsUIManager();
-    }, 500);
+    setTimeout(ensureSettingsManager, 500);
 });
 
 // window加载后再次尝试
-window.addEventListener('load', () => {
-    if (!settingsManager) settingsManager = new SettingsUIManager();
-});
-
-// 导出到全局
-window.settingsManager = settingsManager;
+window.addEventListener('load', ensureSettingsManager);

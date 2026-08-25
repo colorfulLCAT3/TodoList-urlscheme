@@ -43,6 +43,11 @@ class SettingsUIManager {
         this.getDebugInfoBtn = null;
         this.debugInfoOutput = null;
 
+        // 精确闹钟权限元素
+        this.exactAlarmItem = null;
+        this.exactAlarmStatus = null;
+        this.grantExactAlarmBtn = null;
+
         // 延迟初始化
         setTimeout(() => this.init(), 100);
     }
@@ -104,6 +109,11 @@ class SettingsUIManager {
         this.sendTestNotificationBtn = document.getElementById('send-test-notification');
         this.getDebugInfoBtn = document.getElementById('get-debug-info');
         this.debugInfoOutput = document.getElementById('debug-info-output');
+
+        // 精确闹钟权限元素
+        this.exactAlarmItem = document.getElementById('exact-alarm-item');
+        this.exactAlarmStatus = document.getElementById('exact-alarm-status');
+        this.grantExactAlarmBtn = document.getElementById('grant-exact-alarm-btn');
     }
     
     bindEvents() {
@@ -159,6 +169,9 @@ class SettingsUIManager {
         this.sendTestNotificationBtn?.addEventListener('click', () => this.sendTestNotification());
         this.getDebugInfoBtn?.addEventListener('click', () => this.getDebugInfo());
 
+        // 精确闹钟权限事件
+        this.grantExactAlarmBtn?.addEventListener('click', () => this.grantExactAlarmPermission());
+
         // ESC键关闭
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.modal && this.modal.style.display === 'flex') this.closeModal();
@@ -203,6 +216,9 @@ class SettingsUIManager {
 
         // 初始化调试模式区（Android 原生端）
         this.initDebugSection();
+
+        // 更新精确闹钟权限状态（Android 原生端）
+        this.updateExactAlarmState();
     }
 
     // 更新语言状态
@@ -497,6 +513,32 @@ class SettingsUIManager {
         });
     }
 
+    // ---------- 精确闹钟权限（Android 原生端） ----------
+
+    // 检查并展示闹钟权限状态；无原生桥时隐藏整个区域
+    updateExactAlarmState() {
+        const hasNative = typeof window.TodoNative !== 'undefined';
+        if (this.exactAlarmItem) this.exactAlarmItem.style.display = hasNative ? '' : 'none';
+        if (!hasNative) return;
+
+        const canExact = !!window.TodoNative.canScheduleExactAlarms && window.TodoNative.canScheduleExactAlarms();
+        if (this.exactAlarmStatus) {
+            this.exactAlarmStatus.textContent = canExact ? '已授予 ✅' : '未授予 ⚠️';
+            this.exactAlarmStatus.style.color = canExact ? 'var(--success-color, #28a745)' : 'var(--danger-color, #dc3545)';
+        }
+        if (this.grantExactAlarmBtn) this.grantExactAlarmBtn.style.display = canExact ? 'none' : '';
+    }
+
+    // 跳系统设置授予精确闹钟权限
+    grantExactAlarmPermission() {
+        console.log('[TodoDebug] 点击「去授权」');
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.openExactAlarmSettings) {
+            window.TodoNative.openExactAlarmSettings();
+        } else {
+            Utils.showToast('仅 Android 原生端可用', 'warning');
+        }
+    }
+
     // ---------- 调试模式（Android 原生端） ----------
 
     // 初始化调试区：原生桥存在才显示；恢复开关与面板状态
@@ -544,6 +586,12 @@ class SettingsUIManager {
                 lines.push(`通知权限: ${info.notificationPermissionLabel}`);
                 if (!info.hasNotificationPermission) {
                     lines.push('⚠️ 未授予通知权限！请在系统设置中允许 TodoList 通知');
+                }
+                if (typeof info.canScheduleExactAlarms !== 'undefined') {
+                    lines.push(`精确闹钟: ${info.exactAlarmLabel}`);
+                    if (!info.canScheduleExactAlarms) {
+                        lines.push('⚠️ 未授予精确闹钟权限！后台提醒可能延迟，请在设置中授权');
+                    }
                 }
             } catch (e) {
                 lines.push(`原生信息读取失败: ${e.message}`);

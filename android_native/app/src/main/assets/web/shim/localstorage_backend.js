@@ -43,7 +43,27 @@
 
     // ---------- 任务 CRUD ----------
     function getTasks() { return load(KEY_TASKS, []); }
-    function setTasks(tasks) { save(KEY_TASKS, tasks); }
+    function setTasks(tasks) {
+        save(KEY_TASKS, tasks);
+        // Android 原生端：同步任务镜像并重排后台闹钟
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.syncTasks) {
+            try { window.TodoNative.syncTasks(JSON.stringify(tasks)); } catch (e) { /* ignore */ }
+        }
+    }
+
+    // Android 原生端：同步提醒配置（enabled/offsets）并重排闹钟
+    function syncRemindConfig() {
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.syncConfig) {
+            try {
+                var enabled = localStorage.getItem('todolist_remind_enabled');
+                var offsets = localStorage.getItem('todolist_remind_offsets');
+                window.TodoNative.syncConfig(
+                    enabled === null ? true : enabled === 'true',
+                    offsets === null ? '30,10,5' : offsets
+                );
+            } catch (e) { /* ignore */ }
+        }
+    }
 
     function getCategories() { return load(KEY_CATEGORIES, []); }
     function setCategories(cats) { save(KEY_CATEGORIES, cats); }
@@ -340,6 +360,8 @@
             settings[key] = value;
             setSettings(settings);
             try { localStorage.setItem('todolist_' + key, String(value)); } catch (e) { /* ignore */ }
+            // 提醒配置变化时同步到原生并重排闹钟
+            if (key === 'remind_enabled' || key === 'remind_offsets') syncRemindConfig();
             return ok(true);
         },
 

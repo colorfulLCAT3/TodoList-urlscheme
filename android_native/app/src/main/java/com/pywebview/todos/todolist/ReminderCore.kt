@@ -1,0 +1,270 @@
+package com.pywebview.todos.todolist
+
+import android.Manifest
+import android.app.AlarmManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import org.json.JSONArray
+import org.json.JSONObject
+
+/**
+ * 后台提醒核心：SharedPreferences 镜像 + AlarmManager 精确闹钟 + 通知发送。
+ * 前端 localStorage 是唯一数据源，通过 TodoNative.syncTasks/syncConfig 镜像到
+ * SharedPreferences，闹钟 Receiver / 兜底 Service 从镜像读取（它们拿不到 WebView）。
+ */
+object ReminderStore {
+    private const val PREFS = "todo_reminder_prefs"
+    private const val KEY_TASKS = "tasks_json"
+    private const val KEY_ENABLED = "remind_enabled"
+    private const val KEY_OFFSETS = "remind_offsets"
+    private const val KEY_NOTIFIED = "notified_keys"
+    private const val KEY_SCHEDULED = "scheduled_codes"
+
+    private fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    fun setTasks(ctx: Context, json: String) {
+        prefs(ctx).edit().putString(KEY_TASKS, json).apply()
+    }
+
+    fun getTasks(ctx: Context): String? = prefs(ctx).getString(KEY_TASKS, null)
+
+    fun setEnabled(ctx: Context, enabled: Boolean) {
+        prefs(ctx).edit().putBoolean(KEY_ENABLED, enabled).apply()
+    }
+
+    fun getEnabled(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_ENABLED, true)
+
+    fun setOffsets(ctx: Context, raw: String) {
+        prefs(ctx).edit().putString(KEY_OFFSETS, raw).apply()
+    }
+
+    fun getOffsetsRaw(ctx: Context): String = prefs(ctx).getString(KEY_OFFSETS, "30,10,5") ?: "30,10,5"
+
+    /** 已通知的去重键集合，闹钟 Receiver 与兜底 Service 共用 */
+    fun notifiedKeys(ctx: Context): MutableSet<String> =
+        HashSet(prefs(ctx).getStringSet(KEY_NOTIFIED, emptySet()) ?: emptySet())
+
+    fun addNotified(ctx: Context, key: String) {
+        val set = notifiedKeys(ctx)
+        set.add(key)
+        prefs(ctx).edit().putStringSet(KEY_NOTIFIED, set).apply()
+    }
+
+    /** 已设置的闹钟 requestCode 集合，用于任务变更时全量取消 */
+    fun scheduledCodes(ctx: Context): Set<String> =
+        HashSet(prefs(ctx).getStringSet(KEY_SCHEDULED, emptySet()) ?: emptySet())
+
+    fun setScheduledCodes(ctx: Context, codes: Set<String>) {
+        prefs(ctx).edit().putStringSet(KEY_SCHEDULED, codes).apply()
+    }
+}
+
+object ReminderAlarm {
+    private const val TAG = "TodoAlarm"
+
+    /** 解析 "30,10,5" → 升序去重正整数（最紧急档位在前） */
+    fun parseOffsets(raw: String): List<Int> {
+        return try {
+            raw.split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .mapNotNull { it.toIntOrNull() }
+                .filter { it > 0 }
+                .distinct()
+                .sorted()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /** 解析 "YYYY-MM-DD HH:MM" 或 ISO "YYYY-MM-DDTHH:MM:SS" → epoch ms */
+    fun parseDate(due: String): Long? {
+        return try {
+            val normalized = due.replace("T", " ")
+            val parts = normalized.split(" ")
+            if (parts.size < 2) return null
+            val dateParts = parts[0].split("-")
+            val timeParts = parts[1].split(":").take(3).map { it.toInt() }
+            val cal = java.util.Calendar.getInstance().apply {
+                set(dateParts[0].toInt(), dateParts[1].toInt() - 1, dateParts[2].toInt(), timeParts[0], timeParts[1], if (timeParts.size > 2) timeParts[2] else 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+            }
+            cal.timeInMillis
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun requestCode(taskId: String, offset: String): Int =
+        (taskId + "_" + offset).hashCode() and 0x7FFFFFFF
+
+    /** 任务/配置变化后全量重排闹钟 */
+    fun scheduleAll(ctx: Context) {
+        val enabled = ReminderStore.getEnabled(ctx)
+        val offsets = parseOffsets(ReminderStore.getOffsetsRaw(ctx))
+        val tasksJson = ReminderStore.getTasks(ctx)
+
+        cancelAll(ctx)
+
+        if (!enabled || offsets.isEmpty() || tasksJson == null) return
+
+        val alarm = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()
+        val now = System.currentTimeMillis()
+        val scheduled = HashSet<String>()
+
+        try {
+            val tasks = JSONArray(tasksJson)
+            for (i in 0 until tasks.length()) {
+                val task = tasks.getJSONObject(i)
+                if (task.optBoolean("completed", false)) continue
+                val due = task.optString("dueDate", "")
+                if (due.isEmpty()) continue
+                val dueMs = parseDate(due) ?: continue
+                val id = task.optString("id", "")
+                if (id.isEmpty()) continue
+                val title = task.optString("title", "任务")
+
+                for (offset in offsets) {
+                    val targetMs = dueMs - offset * 60_000L
+                    if (targetMs <= now) continue // 已过的档位不设
+                    val code = requestCode(id, offset.toString())
+                    val pi = pendingIntent(ctx, code, id, offset, dueMs, title)
+                    scheduleOne(alarm, canExact, targetMs, pi)
+                    scheduled.add(code.toString())
+                }
+
+                if (dueMs >= now) {
+                    val code = requestCode(id, "due")
+                    val pi = pendingIntent(ctx, code, id, -1, dueMs, title)
+                    scheduleOne(alarm, canExact, dueMs, pi)
+                    scheduled.add(code.toString())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "调度失败: ${e.message}", e)
+        }
+
+        ReminderStore.setScheduledCodes(ctx, scheduled)
+        Log.d(TAG, "调度完成: ${scheduled.size} 个闹钟, 精确=${canExact}, offsets=$offsets")
+    }
+
+    private fun pendingIntent(ctx: Context, code: Int, taskId: String, offset: Int, dueMs: Long, title: String): PendingIntent {
+        val intent = Intent(ctx, ReminderReceiver::class.java)
+            .putExtra("taskId", taskId)
+            .putExtra("offset", offset) // -1 表示到期
+            .putExtra("dueMs", dueMs)
+            .putExtra("title", title)
+        return PendingIntent.getBroadcast(
+            ctx, code, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun scheduleOne(alarm: AlarmManager, canExact: Boolean, triggerAt: Long, pi: PendingIntent) {
+        try {
+            if (canExact) {
+                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+            } else {
+                // 未授予精确闹钟权限：用 10 分钟窗口的非精确闹钟，兜底服务会补发
+                alarm.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 10 * 60_000L, pi)
+            }
+        } catch (e: SecurityException) {
+            Log.w(TAG, "精确闹钟被拒，改用非精确: ${e.message}")
+            try {
+                alarm.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 10 * 60_000L, pi)
+            } catch (e2: Exception) {
+                Log.e(TAG, "非精确闹钟也失败: ${e2.message}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "设置闹钟失败: ${e.message}")
+        }
+    }
+
+    fun cancelAll(ctx: Context) {
+        val alarm = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        for (code in ReminderStore.scheduledCodes(ctx)) {
+            try {
+                val pi = PendingIntent.getBroadcast(
+                    ctx, code.toIntOrNull() ?: continue,
+                    Intent(ctx, ReminderReceiver::class.java),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                alarm.cancel(pi)
+            } catch (e: Exception) {
+                // 忽略单个取消失败
+            }
+        }
+        ReminderStore.setScheduledCodes(ctx, emptySet())
+    }
+}
+
+object ReminderNotifier {
+    private const val TAG = "TodoReminder"
+    private const val CHANNEL_ID = "todo_reminder"
+    private const val NOTIFICATION_PERMISSION = 1001
+
+    fun ensureChannel(ctx: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(CHANNEL_ID, "任务提醒", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "任务开始前与到期的提醒"
+            }
+            val manager = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    fun hasPermission(ctx: Context): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /** minutes<=0 表示到期提醒；返回是否真正发送 */
+    fun send(ctx: Context, title: String, minutes: Int, isDue: Boolean = false, isTest: Boolean = false): Boolean {
+        ensureChannel(ctx)
+        val notifTitle = when {
+            isTest -> "🔔 测试通知"
+            isDue -> "✅ 任务开始时间到了"
+            else -> "📝 任务即将开始"
+        }
+        val notifText = when {
+            isTest -> "通知通道正常（测试：$title）"
+            isDue -> "任务「$title」开始时间已到，现在开始吧！"
+            else -> "任务「$title」将在 $minutes 分钟后开始"
+        }
+
+        if (!hasPermission(ctx)) {
+            Log.e(TAG, "通知未发送: POST_NOTIFICATIONS 权限未授予！请在系统设置中允许 TodoList 通知")
+            return false
+        }
+        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(notifTitle)
+            .setContentText(notifText)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .build()
+        return try {
+            val id = when {
+                isTest -> 999999
+                isDue -> (title.hashCode() and 0xFFFFFF) xor 0x111111
+                else -> title.hashCode() and 0xFFFFFF
+            }
+            NotificationManagerCompat.from(ctx).notify(id, notification)
+            Log.d(TAG, "通知已发送: $notifTitle / $notifText (id=$id)")
+            true
+        } catch (e: SecurityException) {
+            Log.e(TAG, "通知发送失败(SecurityException): ${e.message}")
+            false
+        }
+    }
+}

@@ -2,17 +2,14 @@ package com.pywebview.todos.todolist
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.NotificationChannel
-import android.app.NotificationManager
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
@@ -20,28 +17,19 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
-import java.util.Timer
-import java.util.TimerTask
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private var pendingUrl: String? = null
     private var pageLoaded = false
-    private val reminderHandler = Handler(Looper.getMainLooper())
-    private val reminderTimer = Timer()
-    private val notifiedTaskIds = mutableSetOf<String>()
 
     companion object {
         private const val TAG = "TodoReminder"
-        private const val CHANNEL_ID = "todo_reminder"
         private const val NOTIFICATION_PERMISSION = 1001
     }
 
@@ -55,7 +43,7 @@ class MainActivity : AppCompatActivity() {
         // 允许 chrome://inspect 远程调试 WebView（仅调试构建）
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
-        createNotificationChannel()
+        ReminderNotifier.ensureChannel(this)
         webView = WebView(this)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
@@ -70,7 +58,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 原生桥：调试模式按钮 / 获取调试信息
+        // 原生桥：任务/配置同步 + 调试模式
         webView.addJavascriptInterface(TodoNative(), "TodoNative")
 
         webView.webViewClient = object : WebViewClient() {
@@ -107,8 +95,9 @@ class MainActivity : AppCompatActivity() {
         // 请求通知权限（Android 13+）
         requestNotificationPermission()
 
-        // 启动提醒轮询
-        startReminderCheck()
+        // 启动前台兜底服务 + 从镜像恢复精确闹钟调度
+        startReminderService()
+        ReminderAlarm.scheduleAll(this)
     }
 
     // ---------- URL scheme ----------
@@ -141,21 +130,7 @@ class MainActivity : AppCompatActivity() {
         pushUrlToPage(url)
     }
 
-    // ---------- 通知 ----------
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "任务提醒",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "任务开始前提醒"
-            }
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
-        }
-    }
-
+    // ---------- 通知权限 & 后台服务 ----------
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -170,134 +145,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startReminderCheck() {
-        // 每 30 秒扫描一次 localStorage 任务，检查开始时间前 30/10/5 分钟
-        reminderTimer.schedule(object : TimerTask() {
-            override fun run() {
-                checkReminders()
+    private fun startReminderService() {
+        try {
+            val intent = Intent(this, ReminderService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
             }
-        }, 30_000L, 30_000L)
-    }
-
-    private fun checkReminders() {
-        runOnUiThread {
-            try {
-                // 一次读取任务 + 提醒配置（enabled/offsets，缺省默认开启 30,10,5）
-                webView.evaluateJavascript(
-                    "JSON.stringify((function(){try{" +
-                        "var tasks=JSON.parse(localStorage.getItem('todolist_tasks')||'[]');" +
-                        "var enabled=localStorage.getItem('todolist_remind_enabled');" +
-                        "var offsets=localStorage.getItem('todolist_remind_offsets');" +
-                        "return {tasks:tasks,enabled:enabled===null?'true':enabled,offsets:offsets===null?'30,10,5':offsets};" +
-                        "}catch(e){return {tasks:[],enabled:'true',offsets:'30,10,5'}}})())",
-                    object : android.webkit.ValueCallback<String> {
-                        override fun onReceiveValue(value: String?) {
-                            if (value == null || value == "null" || value == "\"null\"") return
-                            try {
-                                // evaluateJavascript 对字符串返回值会整体加引号转义，先解开
-                                val raw = value.trim()
-                                val jsonStr = if (raw.startsWith("\"") && raw.endsWith("\"") && raw.length >= 2) {
-                                    JSONObject("{\"v\":" + raw + "}").getString("v")
-                                } else {
-                                    raw
-                                }
-                                val obj = JSONObject(jsonStr)
-                                if (obj.optString("enabled", "true") == "false") {
-                                    Log.d(TAG, "提醒已关闭，跳过")
-                                    return
-                                }
-                                val offsets = parseOffsets(obj.optString("offsets", "30,10,5")) // 升序，最紧急档位在前
-                                if (offsets.isEmpty()) return
-
-                                val tasks = obj.getJSONArray("tasks")
-                                val now = System.currentTimeMillis()
-                                Log.d(TAG, "扫描: ${tasks.length()} 任务, offsets=$offsets, 通知权限=${hasNotificationPermission()}")
-
-                                for (i in 0 until tasks.length()) {
-                                    val task = tasks.getJSONObject(i)
-                                    val id = task.optString("id", "")
-                                    if (id.isEmpty()) continue
-                                    if (task.optBoolean("completed", false)) continue
-                                    val due = task.optString("dueDate", "")
-                                    if (due.isEmpty()) continue
-                                    val dueMs = parseDate(due) ?: continue
-                                    val remainMs = dueMs - now
-                                    val title = task.optString("title", "任务")
-
-                                    // 到期提醒：开始时间已到，提醒一次
-                                    if (remainMs <= 0) {
-                                        val dueKey = id + "_due"
-                                        if (!notifiedTaskIds.contains(dueKey)) {
-                                            notifiedTaskIds.add(dueKey)
-                                            Log.d(TAG, "到期提醒: $title")
-                                            showReminder(title, 0, isDue = true)
-                                        }
-                                        continue
-                                    }
-
-                                    // 提前提醒：触发"已到提醒时间且未提醒过"的最紧急档位（升序最先命中）
-                                    // 文案显示实际剩余分钟，避免扫描滞后时与真实时间不符
-                                    val remainMin = remainMs / 60000.0
-                                    for (offset in offsets) {
-                                        val targetMs = dueMs - offset * 60_000L
-                                        if (now < targetMs) continue // 该档位还没到提醒时间，看更不紧急的
-                                        val key = id + "_" + offset
-                                        if (notifiedTaskIds.contains(key)) break // 最紧急已到时间档已触发 → 更不紧急的已过期，停止
-                                        notifiedTaskIds.add(key)
-                                        val showMin = Math.round(remainMin).toInt().coerceAtLeast(1)
-                                        Log.d(TAG, "触发 $offset 分钟档(实际剩 $showMin 分钟): $title")
-                                        showReminder(title, showMin)
-                                        break
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                Log.e(TAG, "提醒解析失败: ${e.message}", e)
-                            }
-                        }
-                    }
-                )
-            } catch (e: Exception) {
-                // 忽略
-            }
-        }
-    }
-
-    // 解析 "30,10,5" → 升序去重的正整数列表（最紧急档位在前）
-    private fun parseOffsets(raw: String): List<Int> {
-        return try {
-            raw.split(",")
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .mapNotNull { it.toIntOrNull() }
-                .filter { it > 0 }
-                .distinct()
-                .sorted()
         } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    private fun parseDate(due: String): Long? {
-        return try {
-            // 支持 "YYYY-MM-DD HH:MM" 和 ISO "YYYY-MM-DDTHH:MM:SS"
-            val normalized = due.replace("T", " ")
-            val parts = normalized.split(" ")
-            if (parts.size < 2) return null
-            val dateParts = parts[0].split("-")
-            val timeParts = parts[1].split(":".toRegex()).take(3).map { it.toInt() }
-            val year = dateParts[0].toInt()
-            val month = dateParts[1].toInt()
-            val day = dateParts[2].toInt()
-            val hour = timeParts[0]
-            val minute = timeParts[1]
-            val second = if (timeParts.size > 2) timeParts[2] else 0
-            val cal = java.util.Calendar.getInstance().apply {
-                set(year, month - 1, day, hour, minute, second)
-                set(java.util.Calendar.MILLISECOND, 0)
-            }
-            cal.timeInMillis
-        } catch (e: Exception) {
-            null
+            Log.e(TAG, "启动提醒服务失败: ${e.message}")
         }
     }
 
@@ -306,46 +163,58 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun showReminder(title: String, minutes: Int, isDue: Boolean = false, isTest: Boolean = false) {
-        val notifTitle = when {
-            isTest -> "🔔 测试通知"
-            isDue -> "✅ 任务开始时间到了"
-            else -> "📝 任务即将开始"
-        }
-        val notifText = when {
-            isTest -> "通知通道正常（测试：$title）"
-            isDue -> "任务「$title」开始时间已到，现在开始吧！"
-            else -> "任务「$title」将在 $minutes 分钟后开始"
-        }
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(notifTitle)
-            .setContentText(notifText)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setAutoCancel(true)
-            .build()
-
-        if (!hasNotificationPermission()) {
-            Log.e(TAG, "通知未发送: POST_NOTIFICATIONS 权限未授予！请在系统设置中允许 TodoList 通知")
-            return
-        }
-        try {
-            // 测试通知用固定 id，避免与任务通知冲突
-            val id = if (isTest) 999999 else (title.hashCode() and 0xFFFFFF)
-            NotificationManagerCompat.from(this).notify(id, notification)
-            Log.d(TAG, "通知已发送: $notifTitle / $notifText (id=$id)")
-        } catch (e: SecurityException) {
-            Log.e(TAG, "通知发送失败(SecurityException): 权限被拒或系统通知被关闭", e)
-        }
+    private fun canScheduleExactAlarms(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            (getSystemService(Context.ALARM_SERVICE) as AlarmManager).canScheduleExactAlarms()
     }
 
-    // 调试模式：前端点击"发送测试通知"时调用，直接验证通知通道/权限
+    // ---------- 原生桥 ----------
     private inner class TodoNative {
+        // 前端任务变化时同步到镜像并重排闹钟
+        @JavascriptInterface
+        fun syncTasks(tasksJson: String?) {
+            Log.d(TAG, "syncTasks: ${tasksJson?.length ?: 0} 字符")
+            if (tasksJson.isNullOrEmpty()) return
+            runOnUiThread {
+                ReminderStore.setTasks(this@MainActivity, tasksJson)
+                ReminderAlarm.scheduleAll(this@MainActivity)
+            }
+        }
+
+        // 前端提醒配置变化时同步并重排
+        @JavascriptInterface
+        fun syncConfig(enabled: Boolean, offsets: String) {
+            Log.d(TAG, "syncConfig: enabled=$enabled, offsets=$offsets")
+            runOnUiThread {
+                ReminderStore.setEnabled(this@MainActivity, enabled)
+                ReminderStore.setOffsets(this@MainActivity, offsets)
+                ReminderAlarm.scheduleAll(this@MainActivity)
+            }
+        }
+
+        // 精确闹钟权限状态（供前端引导）
+        @JavascriptInterface
+        fun canScheduleExactAlarms(): Boolean = this@MainActivity.canScheduleExactAlarms()
+
+        // 跳系统设置授予精确闹钟权限
+        @JavascriptInterface
+        fun openExactAlarmSettings() {
+            runOnUiThread {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")))
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "打开闹钟权限设置失败: ${e.message}")
+                }
+            }
+        }
+
         @JavascriptInterface
         fun sendTestNotification(title: String?) {
             Log.d(TAG, "调试: 用户点击「发送测试通知」")
             runOnUiThread {
-                showReminder(title ?: "测试通知", 5, isTest = true)
+                ReminderNotifier.send(this@MainActivity, title ?: "测试通知", 5, isTest = true)
             }
         }
 
@@ -361,6 +230,8 @@ class MainActivity : AppCompatActivity() {
                 info.put("sdkInt", Build.VERSION.SDK_INT)
                 info.put("hasNotificationPermission", hasNotificationPermission())
                 info.put("notificationPermissionLabel", if (hasNotificationPermission()) "已授予" else "未授予(通知不会弹出!)")
+                info.put("canScheduleExactAlarms", canScheduleExactAlarms())
+                info.put("exactAlarmLabel", if (canScheduleExactAlarms()) "已授予" else "未授予(后台提醒可能延迟)")
                 info.toString()
             } catch (e: Exception) {
                 "{\"error\":\"" + (e.message ?: "unknown") + "\"}"
@@ -380,7 +251,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        reminderTimer.cancel()
         webView.destroy()
     }
 }

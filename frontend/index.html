@@ -742,6 +742,18 @@
                     </div>
                 </div>
 
+                <!-- 精确闹钟权限（Android 原生端，后台提醒稳定性） -->
+                <div class="setting-item-config" id="exact-alarm-item" style="display: none;">
+                    <div class="config-item">
+                        <label class="data-label">后台提醒（精确闹钟）</label>
+                        <span id="exact-alarm-status" class="data-label">检查中...</span>
+                        <button id="grant-exact-alarm-btn" class="btn btn--primary-color setting-config-btn" style="display: none;">去授权</button>
+                    </div>
+                    <div class="config-item" style="color: var(--text-secondary); font-size: 12px;">
+                        授予后，即使应用在后台/锁屏，任务提醒也会准点弹出。
+                    </div>
+                </div>
+
                 <!-- 调试模式（Android 原生端可用） -->
                 <div class="setting-item" id="debug-mode-item">
                     <div class="setting-label">

@@ -60,11 +60,14 @@ def handle_startup_url():
     backend.globals.pending_url = url
 
 if __name__ == '__main__':
-    # Android logcat 抓取用标记：print 会进 logcat 的 python 标签
+    # Android logcat 抓取用标记：优先用 jnius android.util.Log（100%进logcat）
+    from backend.utils.android_log import log as _android_log
+    _android_log("main.py __main__ 开始执行 (Python 已启动)")
     print("[MAIN-DEBUG] main.py __main__ 开始执行", flush=True)
     try:
         from backend import start
 
+        _android_log("backend.start 导入成功")
         print("[MAIN-DEBUG] backend.start 导入成功", flush=True)
         backend_logger.info("=" * 60)
         backend_logger.info("从 main.py 启动 TodoList 应用")

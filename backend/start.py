@@ -92,6 +92,8 @@ def start_app(is_android = False, ssl_enable = True):
 
     # 创建窗口：首先加载内存中的 loading 页面（零磁盘 I/O，瞬间弹出）
     backend_logger.info("创建应用窗口并展示加载动画...")
+    from backend.utils.android_log import log as _android_log
+    _android_log("start_app: 开始创建窗口")
     print("[START-DEBUG] start_app: 开始创建窗口", flush=True)
 
     # 获取主屏幕尺寸
@@ -105,6 +107,7 @@ def start_app(is_android = False, ssl_enable = True):
         screen_width, screen_height = 1080, 1920
 
     import backend.globals
+    _android_log("准备 webview.create_window（若此后崩溃=WebView创建时崩）")
     print("[START-DEBUG] 准备 webview.create_window", flush=True)
     backend.globals.window = webview.create_window(
         'TodoList',
@@ -191,6 +194,7 @@ def start_app(is_android = False, ssl_enable = True):
         backend_logger.error(f"注册 URL scheme 失败: {e}")
 
     backend_logger.info("启动webview...")
+    _android_log("准备 webview.start()")
     print("[START-DEBUG] 准备 webview.start()（崩溃若在此后，说明是 WebView/Chromium 初始化）", flush=True)
     try:
         # 将 lazy_initialize 函数作为第一个参数传入

@@ -92,13 +92,20 @@ def start_app(is_android = False, ssl_enable = True):
 
     # 创建窗口：首先加载内存中的 loading 页面（零磁盘 I/O，瞬间弹出）
     backend_logger.info("创建应用窗口并展示加载动画...")
+    print("[START-DEBUG] start_app: 开始创建窗口", flush=True)
 
     # 获取主屏幕尺寸
-    target_screen = webview.screens[0]
-    screen_width = target_screen.width
-    screen_height = target_screen.height
+    try:
+        target_screen = webview.screens[0]
+        screen_width = target_screen.width
+        screen_height = target_screen.height
+        print(f"[START-DEBUG] 屏幕尺寸: {screen_width}x{screen_height}", flush=True)
+    except Exception as e:
+        print(f"[START-DEBUG] 获取屏幕失败: {e}，使用默认 1080x1920", flush=True)
+        screen_width, screen_height = 1080, 1920
 
     import backend.globals
+    print("[START-DEBUG] 准备 webview.create_window", flush=True)
     backend.globals.window = webview.create_window(
         'TodoList',
         html=loading_html,  # 【关键】改用 html= 启动，不传递文件路径
@@ -111,16 +118,19 @@ def start_app(is_android = False, ssl_enable = True):
         text_select=True,
         resizable=True
     )
+    print("[START-DEBUG] webview.create_window 完成", flush=True)
 
     backend.globals.window.events.closing += on_closing
 
     # 将后端耗时初始化逻辑，放到初始化回调中异步执行
     def lazy_initialize(window):
         backend_logger.info("异步后台：开始加载后端模块与初始化...")
+        print("[START-DEBUG] lazy_initialize 开始（崩溃若在此前，说明 WebView 创建时就崩）", flush=True)
 
         # 在子线程中延时或直接导入耗时模块
         from backend.api.todo_api import TodoApi
         from backend.utils import utils
+        print("[START-DEBUG] TodoApi 模块导入成功", flush=True)
 
         # 创建API实例
         from backend.features.webdav.webdav_data_sync import get_data_sync_manager
@@ -181,11 +191,13 @@ def start_app(is_android = False, ssl_enable = True):
         backend_logger.error(f"注册 URL scheme 失败: {e}")
 
     backend_logger.info("启动webview...")
+    print("[START-DEBUG] 准备 webview.start()（崩溃若在此后，说明是 WebView/Chromium 初始化）", flush=True)
     try:
         # 将 lazy_initialize 函数作为第一个参数传入
         # pywebview 启动窗口后会立即在后台启动一个线程执行此函数，解决Linux端窗口卡死问题
         webview.start(lazy_initialize, backend.globals.window,
                       private_mode=False, ssl=ssl_enable, debug=False, localization=chinese_localization)
+        print("[START-DEBUG] webview.start() 返回", flush=True)
     finally:
         # 窗口关闭后，停止自动同步
         backend_logger.info("正在停止后台服务...")

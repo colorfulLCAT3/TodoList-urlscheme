@@ -54,6 +54,18 @@ def setup_logger(platform_service, name='todolist', level=logging.INFO, max_byte
     # 创建控制台handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(level)
+
+    # Android 上 stdout 默认块缓冲，日志可能看不到；强制每次写入 flush
+    # 确保日志能立即输出到 logcat
+    class _FlushStream:
+        def write(self, msg):
+            sys.stdout.write(msg)
+            sys.stdout.flush()
+        def flush(self):
+            sys.stdout.flush()
+
+    console_handler = logging.StreamHandler(_FlushStream())
+    console_handler.setLevel(level)
     
     # 设置日志格式
     formatter = logging.Formatter(

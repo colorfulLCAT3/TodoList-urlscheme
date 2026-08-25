@@ -60,20 +60,27 @@ def handle_startup_url():
     backend.globals.pending_url = url
 
 if __name__ == '__main__':
+    # Android logcat 抓取用标记：print 会进 logcat 的 python 标签
+    print("[MAIN-DEBUG] main.py __main__ 开始执行", flush=True)
     try:
         from backend import start
 
+        print("[MAIN-DEBUG] backend.start 导入成功", flush=True)
         backend_logger.info("=" * 60)
         backend_logger.info("从 main.py 启动 TodoList 应用")
         backend_logger.info("=" * 60)
 
         handle_startup_url()
+        print("[MAIN-DEBUG] handle_startup_url 完成，准备 service.start_app()", flush=True)
         service.start_app()
+        print("[MAIN-DEBUG] service.start_app() 返回（不应到达，Android 上应阻塞）", flush=True)
 
     except ImportError as e:
+        print(f"[MAIN-DEBUG] 导入错误: {e}", flush=True)
         print(f"导入错误: {e}")
         print("请检查Python环境是否正确安装了依赖：pip install pywebview")
         sys.exit(1)
     except Exception as e:
+        print(f"[MAIN-DEBUG] 启动应用失败: {e}", flush=True)
         print(f"启动应用失败: {e}")
         sys.exit(1)

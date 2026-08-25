@@ -30,14 +30,22 @@ class TodoApi(
     """TodoList应用的API类，提供前后端通信接口"""
 
     def __init__(self, is_android, sync_manager):
+        print("[API-DEBUG] TodoApi.__init__ 开始", flush=True)
         super().__init__()
+        print("[API-DEBUG] super().__init__ 完成", flush=True)
         self.db = TodoDatabase()
+        print("[API-DEBUG] TodoDatabase 初始化完成", flush=True)
         self.is_android = is_android
         self.sync_manager = sync_manager
         self._data_manager = DataExportManager(self.service)
+        print("[API-DEBUG] DataExportManager 初始化完成", flush=True)
         self._url_scheme_manager = UrlSchemeManager(self.db)
+        print("[API-DEBUG] UrlSchemeManager 初始化完成", flush=True)
         try:
             self.service.add_new_desktop_task_reminder()
             self.get_logger.info("任务提醒器已重置")
+            print("[API-DEBUG] add_new_desktop_task_reminder 完成", flush=True)
         except Exception as e:
             self.get_logger.warning(f"重置任务提醒器失败: {e}")
+            print(f"[API-DEBUG] add_new_desktop_task_reminder 失败: {e}", flush=True)
+        print("[API-DEBUG] TodoApi.__init__ 完成", flush=True)

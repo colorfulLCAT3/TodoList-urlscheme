@@ -119,14 +119,20 @@ class AndroidService(PlatformService):
 
     def start_app(self):
         """启动应用的统一接口"""
+        print("[ANDROID-DEBUG] AndroidService.start_app 开始", flush=True)
         from backend import start
+        print("[ANDROID-DEBUG] backend.start 已导入", flush=True)
         # 先启动任务提醒服务（阻塞前）。失败仅记日志，绝不阻塞/导致应用闪退
         try:
             self.start_desktop_task_reminder(True)
+            print("[ANDROID-DEBUG] 任务提醒服务已启动", flush=True)
         except Exception as e:
             self.backend_logger().error(f"启动任务提醒服务失败: {e}")
+            print(f"[ANDROID-DEBUG] 任务提醒服务启动失败: {e}", flush=True)
         # 安卓端需要开启SSL，否则功能无法使用
+        print("[ANDROID-DEBUG] 准备调用 start.start_app(True, True)", flush=True)
         start.start_app(True, True)
+        print("[ANDROID-DEBUG] start.start_app 返回（不应到达）", flush=True)
 
     def frontend_logger(self):
         """前端日志的统一接口"""

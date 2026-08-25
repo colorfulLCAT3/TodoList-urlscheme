@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace 'com.pywebview.todos.todolist'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.pywebview.todos.todolist"
         minSdk 24
-        targetSdk 33
+        targetSdk 34
         versionCode 1
         versionName "1.0"
     }
@@ -31,7 +31,6 @@ android {
 }
 
 dependencies {
-    // 版本兼容 compileSdk 33（core 1.10 要求 compileSdk 33）
-    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
 }

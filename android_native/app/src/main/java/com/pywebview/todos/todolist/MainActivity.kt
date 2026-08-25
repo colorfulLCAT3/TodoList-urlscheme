@@ -209,6 +209,53 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // 电池优化豁免状态：ColorOS 后台冻结的根源，豁免后闹钟不被拦
+        @JavascriptInterface
+        fun isIgnoringBatteryOptimizations(): Boolean {
+            return try {
+                val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+                pm.isIgnoringBatteryOptimizations(packageName)
+            } catch (e: Exception) {
+                Log.e(TAG, "检查电池优化失败: ${e.message}")
+                false
+            }
+        }
+
+        // 引导用户豁免电池优化（跳系统"忽略电池优化"设置）
+        @JavascriptInterface
+        fun requestIgnoreBatteryOptimizations() {
+            runOnUiThread {
+                try {
+                    startActivity(Intent(
+                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:$packageName")
+                    ))
+                } catch (e: Exception) {
+                    Log.e(TAG, "打开电池优化设置失败: ${e.message}")
+                }
+            }
+        }
+
+        // 跳 ColorOS/realme 自启动管理（后台被冻结时必改这里）
+        @JavascriptInterface
+        fun openAutoStartSettings() {
+            runOnUiThread {
+                try {
+                    startActivity(Intent().apply {
+                        action = "com.coloros.safecenter.permission.startup"
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                } catch (e: Exception) {
+                    // ColorOS 版本差异，回退到应用详情
+                    try {
+                        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+                    } catch (e2: Exception) {
+                        Log.e(TAG, "打开自启动设置失败: ${e2.message}")
+                    }
+                }
+            }
+        }
+
         @JavascriptInterface
         fun sendTestNotification(title: String?) {
             Log.d(TAG, "调试: 用户点击「发送测试通知」")

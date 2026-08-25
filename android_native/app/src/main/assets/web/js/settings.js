@@ -49,6 +49,12 @@ class SettingsUIManager {
         this.exactAlarmStatus = null;
         this.grantExactAlarmBtn = null;
 
+        // 后台运行权限元素
+        this.backgroundItem = null;
+        this.batteryOptStatus = null;
+        this.ignoreBatteryBtn = null;
+        this.autoStartBtn = null;
+
         // 延迟初始化
         setTimeout(() => this.init(), 100);
     }
@@ -116,6 +122,12 @@ class SettingsUIManager {
         this.exactAlarmItem = document.getElementById('exact-alarm-item');
         this.exactAlarmStatus = document.getElementById('exact-alarm-status');
         this.grantExactAlarmBtn = document.getElementById('grant-exact-alarm-btn');
+
+        // 后台运行权限元素
+        this.backgroundItem = document.getElementById('background-item');
+        this.batteryOptStatus = document.getElementById('battery-optimization-status');
+        this.ignoreBatteryBtn = document.getElementById('ignore-battery-btn');
+        this.autoStartBtn = document.getElementById('auto-start-btn');
     }
     
     bindEvents() {
@@ -175,6 +187,10 @@ class SettingsUIManager {
         // 精确闹钟权限事件
         this.grantExactAlarmBtn?.addEventListener('click', () => this.grantExactAlarmPermission());
 
+        // 后台运行权限事件
+        this.ignoreBatteryBtn?.addEventListener('click', () => this.requestIgnoreBattery());
+        this.autoStartBtn?.addEventListener('click', () => this.openAutoStart());
+
         // ESC键关闭
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.modal && this.modal.style.display === 'flex') this.closeModal();
@@ -222,6 +238,9 @@ class SettingsUIManager {
 
         // 更新精确闹钟权限状态（Android 原生端）
         this.updateExactAlarmState();
+
+        // 更新后台运行权限状态（ColorOS 防冻结）
+        this.updateBackgroundState();
     }
 
     // 更新语言状态
@@ -542,6 +561,44 @@ class SettingsUIManager {
         }
     }
 
+    // ---------- 后台运行权限（ColorOS/realme 防冻结） ----------
+
+    // 检查电池优化豁免状态；无原生桥时隐藏整个区域
+    updateBackgroundState() {
+        const hasNative = typeof window.TodoNative !== 'undefined';
+        if (this.backgroundItem) this.backgroundItem.style.display = hasNative ? '' : 'none';
+        if (!hasNative) return;
+
+        let ignoring = false;
+        if (window.TodoNative.isIgnoringBatteryOptimizations) {
+            ignoring = !!window.TodoNative.isIgnoringBatteryOptimizations();
+        }
+        if (this.batteryOptStatus) {
+            this.batteryOptStatus.textContent = ignoring ? '已允许 ✅' : '未允许 ⚠️ 后台提醒可能延迟';
+            this.batteryOptStatus.style.color = ignoring ? 'var(--success-color, #28a745)' : 'var(--danger-color, #dc3545)';
+        }
+    }
+
+    // 跳系统"忽略电池优化"设置
+    requestIgnoreBattery() {
+        console.log('[TodoDebug] 点击「允许后台运行」');
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.requestIgnoreBatteryOptimizations) {
+            window.TodoNative.requestIgnoreBatteryOptimizations();
+        } else {
+            Utils.showToast('仅 Android 原生端可用', 'warning');
+        }
+    }
+
+    // 跳 ColorOS 自启动管理
+    openAutoStart() {
+        console.log('[TodoDebug] 点击「自启动设置」');
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.openAutoStartSettings) {
+            window.TodoNative.openAutoStartSettings();
+        } else {
+            Utils.showToast('仅 Android 原生端可用', 'warning');
+        }
+    }
+
     // ---------- 调试模式（Android 原生端） ----------
 
     // 初始化调试区：原生桥存在才显示；恢复开关与面板状态
@@ -606,6 +663,10 @@ class SettingsUIManager {
                     if (!info.canScheduleExactAlarms) {
                         lines.push('⚠️ 未授予精确闹钟权限！后台提醒可能延迟，请在设置中授权');
                     }
+                }
+                if (typeof window.TodoNative.isIgnoringBatteryOptimizations === 'function') {
+                    const ignoring = !!window.TodoNative.isIgnoringBatteryOptimizations();
+                    lines.push(`电池优化豁免: ${ignoring ? '已允许 ✅' : '未允许 ⚠️ (ColorOS 会冻结后台，务必允许)'}`);
                 }
             } catch (e) {
                 lines.push(`原生信息读取失败: ${e.message}`);

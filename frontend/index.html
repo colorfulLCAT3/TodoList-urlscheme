@@ -754,6 +754,21 @@
                     </div>
                 </div>
 
+                <!-- 后台运行权限（ColorOS/realme 后台冻结的根源） -->
+                <div class="setting-item-config" id="background-item" style="display: none;">
+                    <div class="config-item">
+                        <label class="data-label">后台运行（防冻结）</label>
+                        <span id="battery-optimization-status" class="data-label">检查中...</span>
+                    </div>
+                    <div class="config-item">
+                        <button id="ignore-battery-btn" class="btn btn--primary-color setting-config-btn">允许后台运行</button>
+                        <button id="auto-start-btn" class="btn btn--tertiary-color setting-config-btn">自启动设置</button>
+                    </div>
+                    <div class="config-item" style="color: var(--text-secondary); font-size: 12px;">
+                        ColorOS/realme 会冻结后台应用导致提醒延迟。请开启"允许后台运行"，并在"自启动设置"中允许 TodoList。
+                    </div>
+                </div>
+
                 <!-- 调试模式（Android 原生端可用） -->
                 <div class="setting-item" id="debug-mode-item">
                     <div class="setting-label">

@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import androidx.core.app.AlarmManagerCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -126,8 +127,6 @@ object ReminderAlarm {
             return
         }
 
-        val alarm = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()
         val now = System.currentTimeMillis()
         val scheduled = HashSet<String>()
         var parsedTasks = 0
@@ -159,7 +158,7 @@ object ReminderAlarm {
                     if (targetMs <= now) { skippedPast++; continue } // 已过的档位不设
                     val code = requestCode(id, offset.toString())
                     val pi = pendingIntent(ctx, code, id, offset, dueMs, title)
-                    scheduleOne(alarm, canExact, targetMs, pi)
+                    scheduleOne(ctx, targetMs, pi)
                     scheduled.add(code.toString())
                     detail.append("\n  [${title}] 提前${offset}min @ ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(targetMs))}")
                 }
@@ -167,7 +166,7 @@ object ReminderAlarm {
                 if (dueMs >= now) {
                     val code = requestCode(id, "due")
                     val pi = pendingIntent(ctx, code, id, -1, dueMs, title)
-                    scheduleOne(alarm, canExact, dueMs, pi)
+                    scheduleOne(ctx, dueMs, pi)
                     scheduled.add(code.toString())
                     detail.append("\n  [${title}] 到期 @ ${dueStr}")
                 }
@@ -179,14 +178,12 @@ object ReminderAlarm {
         }
 
         ReminderStore.setScheduledCodes(ctx, scheduled)
-        lastScheduleLog = "设了 ${scheduled.size} 个闹钟 | 可解析任务 $parsedTasks | 精确=$canExact | 跳过无时间/过期 $skippedNoTime/$skippedPast" + detail
-        Log.d(TAG, "调度完成: ${scheduled.size} 个闹钟, 精确=$canExact, 任务=$parsedTasks$detail")
+        lastScheduleLog = "设了 ${scheduled.size} 个闹钟 | 可解析任务 $parsedTasks | setAlarmClock(系统闹钟) | 跳过无时间/过期 $skippedNoTime/$skippedPast" + detail
+        Log.d(TAG, "调度完成: ${scheduled.size} 个闹钟, 任务=$parsedTasks$detail")
     }
 
-    /** 调试用：设一个 delayMs 后触发的精确闹钟，验证 AlarmManager→Receiver 链路 */
+    /** 调试用：设一个 delayMs 后触发的系统闹钟，验证 AlarmManager→Receiver 链路 */
     fun scheduleTestAlarm(ctx: Context, delayMs: Long) {
-        val alarm = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarm.canScheduleExactAlarms()
         val triggerAt = System.currentTimeMillis() + delayMs
         val pi = PendingIntent.getBroadcast(
             ctx, 0x0F00F00, // 固定测试 code
@@ -198,14 +195,8 @@ object ReminderAlarm {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         try {
-            if (canExact) {
-                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-                Log.d(TAG, "测试闹钟已设（精确），${delayMs / 1000} 秒后触发")
-            } else {
-                alarm.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 60_000L, pi)
-                Log.d(TAG, "测试闹钟已设（非精确窗口），${delayMs / 1000} 秒后触发")
-            }
-            lastScheduleLog = "测试闹钟已设，${delayMs / 1000} 秒后触发（精确=$canExact）"
+            scheduleOne(ctx, triggerAt, pi)
+            lastScheduleLog = "测试闹钟已设，${delayMs / 1000} 秒后触发"
         } catch (e: Exception) {
             lastScheduleLog = "测试闹钟设置失败: ${e.message}"
             Log.e(TAG, "测试闹钟失败: ${e.message}", e)
@@ -224,23 +215,22 @@ object ReminderAlarm {
         )
     }
 
-    private fun scheduleOne(alarm: AlarmManager, canExact: Boolean, triggerAt: Long, pi: PendingIntent) {
+    /**
+     * 用 setAlarmClock 调度：系统级闹钟，ColorOS/realme 不会冻结，
+     * 且不需要 SCHEDULE_EXACT_ALARM 权限，后台/锁屏也能准点触发。
+     */
+    private fun scheduleOne(ctx: Context, triggerAt: Long, pi: PendingIntent) {
+        val alarm = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val showIntent = PendingIntent.getActivity(
+            ctx, 0,
+            Intent(ctx, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         try {
-            if (canExact) {
-                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-            } else {
-                // 未授予精确闹钟权限：用 10 分钟窗口的非精确闹钟，兜底服务会补发
-                alarm.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 10 * 60_000L, pi)
-            }
-        } catch (e: SecurityException) {
-            Log.w(TAG, "精确闹钟被拒，改用非精确: ${e.message}")
-            try {
-                alarm.setWindow(AlarmManager.RTC_WAKEUP, triggerAt, 10 * 60_000L, pi)
-            } catch (e2: Exception) {
-                Log.e(TAG, "非精确闹钟也失败: ${e2.message}")
-            }
+            AlarmManagerCompat.setAlarmClock(alarm, triggerAt, showIntent, pi)
+            Log.d(TAG, "setAlarmClock 已设 @ ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(triggerAt))}")
         } catch (e: Exception) {
-            Log.e(TAG, "设置闹钟失败: ${e.message}")
+            Log.e(TAG, "setAlarmClock 失败: ${e.message}", e)
         }
     }
 

@@ -748,6 +748,7 @@ class TodoManager {
                 currentX: 0,
                 currentLeft: 0,
                 isOpen: false,
+                dragged: false, // 是否发生了实际位移（区分点击与滑动）
                 startClientX: 0, // 用于存储触摸或鼠标的起始X坐标
                 startClientY: 0  // 用于存储触摸或鼠标的起始Y坐标
             };
@@ -786,6 +787,7 @@ class TodoManager {
 
                 // 开始拖拽
                 state.isDragging = true;
+                state.dragged = false;
                 state.startClientX = getClientX(e);
                 state.startClientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
                 state.currentLeft = content.offsetLeft;
@@ -804,6 +806,9 @@ class TodoManager {
                 const currentClientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
                 const deltaX = currentClientX - state.startClientX;
                 const deltaY = currentClientY - state.startClientY;
+
+                // 发生实际位移则标记，点击时不再打开详情（区分滑动与点击）
+                if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) state.dragged = true;
 
                 // 只有当水平拖拽距离大于垂直拖拽距离时，才认为是水平拖拽
                 if (Math.abs(deltaX) > Math.abs(deltaY)) {
@@ -874,6 +879,16 @@ class TodoManager {
                     e.stopPropagation();
                     return;
                 }
+
+                // 发生位移（滑动）则不视为点击，直接跳过
+                if (state.dragged) {
+                    state.dragged = false;
+                    return;
+                }
+
+                // 点击任务卡片主体：打开任务详情
+                const taskId = item.dataset.taskId;
+                if (taskId) this.viewTaskDetails(taskId);
             };
 
             // 存储事件处理函数

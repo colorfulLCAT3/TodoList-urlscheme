@@ -76,6 +76,11 @@
             var direct = localStorage.getItem('todolist_' + key);
             if (direct !== null && value === undefined) value = direct;
         } catch (e) { /* ignore */ }
+        // 首次安装默认开启提前提醒、默认时间点 30,10,5（与桌面端一致）
+        if (value === undefined) {
+            if (key === 'remind_enabled') value = 'true';
+            else if (key === 'remind_offsets') value = '30,10,5';
+        }
         return value;
     }
 

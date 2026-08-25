@@ -34,6 +34,8 @@ class MainActivity : AppCompatActivity() {
     private val reminderHandler = Handler(Looper.getMainLooper())
     private val reminderTimer = Timer()
     private val notifiedTaskIds = mutableSetOf<String>()
+    // 每任务上次扫描的剩余分钟数（用于检测跨过提醒档位边界）
+    private val prevRemaining = mutableMapOf<String, Double>()
 
     companion object {
         private const val CHANNEL_ID = "todo_reminder"
@@ -163,34 +165,65 @@ class MainActivity : AppCompatActivity() {
     private fun checkReminders() {
         runOnUiThread {
             try {
+                // 一次读取任务 + 提醒配置（enabled/offsets，缺省默认开启 30,10,5）
                 webView.evaluateJavascript(
-                    "JSON.stringify((function(){try{return JSON.parse(localStorage.getItem('todolist_tasks')||'[]')}catch(e){return[]}})())",
+                    "JSON.stringify((function(){try{" +
+                        "var tasks=JSON.parse(localStorage.getItem('todolist_tasks')||'[]');" +
+                        "var enabled=localStorage.getItem('todolist_remind_enabled');" +
+                        "var offsets=localStorage.getItem('todolist_remind_offsets');" +
+                        "return {tasks:tasks,enabled:enabled===null?'true':enabled,offsets:offsets===null?'30,10,5':offsets};" +
+                        "}catch(e){return {tasks:[],enabled:'true',offsets:'30,10,5'}}})())",
                     object : android.webkit.ValueCallback<String> {
                         override fun onReceiveValue(value: String?) {
                             if (value == null || value == "null" || value == "\"null\"") return
                             try {
-                                val json = value.trim()
-                                // evaluateJavascript 返回带引号的 JSON 字符串，去掉外层引号
-                                val tasks = JSONObject("{\"tasks\":" + json + "}").getJSONArray("tasks")
+                                val obj = JSONObject(value.trim())
+                                if (obj.optString("enabled", "true") == "false") return
+                                val offsets = parseOffsets(obj.optString("offsets", "30,10,5"))
+                                if (offsets.isEmpty()) return
+
+                                val tasks = obj.getJSONArray("tasks")
                                 val now = System.currentTimeMillis()
+                                val minOffset = offsets.min()
+
                                 for (i in 0 until tasks.length()) {
                                     val task = tasks.getJSONObject(i)
                                     val id = task.optString("id", "")
                                     if (id.isEmpty()) continue
-                                    val completed = task.optBoolean("completed", false)
-                                    if (completed) continue
+                                    if (task.optBoolean("completed", false)) {
+                                        prevRemaining.remove(id)
+                                        continue
+                                    }
                                     val due = task.optString("dueDate", "")
                                     if (due.isEmpty()) continue
                                     val dueMs = parseDate(due) ?: continue
                                     val remainMs = dueMs - now
-                                    if (remainMs > 0 && remainMs <= 30 * 60 * 1000L) {
-                                        // 30 分钟内：发送提醒（避免重复）
-                                        val key = id + "_" + (remainMs / 60000)
-                                        if (!notifiedTaskIds.contains(key)) {
-                                            notifiedTaskIds.add(key)
-                                            showReminder(task.optString("title", "任务"), remainMs)
+                                    if (remainMs <= 0) continue
+
+                                    val remainMin = remainMs / 60000.0
+                                    val prev = prevRemaining[id]
+
+                                    if (prev == null) {
+                                        // 首次见到该任务：进入最小档窗口才补发最小档，否则仅记录
+                                        if (remainMin <= minOffset) {
+                                            val key = id + "_" + minOffset
+                                            if (!notifiedTaskIds.contains(key)) {
+                                                notifiedTaskIds.add(key)
+                                                showReminder(task.optString("title", "任务"), minOffset)
+                                            }
+                                        }
+                                    } else {
+                                        // 剩余时间跨过某档位边界时，发该档位提醒（每档每任务一次）
+                                        for (offset in offsets) {
+                                            val key = id + "_" + offset
+                                            if (notifiedTaskIds.contains(key)) continue
+                                            if (remainMin <= offset && offset < prev) {
+                                                notifiedTaskIds.add(key)
+                                                showReminder(task.optString("title", "任务"), offset)
+                                            }
                                         }
                                     }
+                                    prevRemaining[id] = remainMin
                                 }
                             } catch (e: Exception) {
                                 // 解析失败忽略
@@ -201,6 +234,21 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 // 忽略
             }
+        }
+    }
+
+    // 解析 "30,10,5" → 降序去重的正整数列表
+    private fun parseOffsets(raw: String): List<Int> {
+        return try {
+            raw.split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .mapNotNull { it.toIntOrNull() }
+                .filter { it > 0 }
+                .distinct()
+                .sortedDescending()
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
@@ -228,8 +276,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showReminder(title: String, remainMs: Long) {
-        val minutes = (remainMs / 60000).coerceAtLeast(1)
+    private fun showReminder(title: String, offsetMinutes: Int) {
+        val minutes = offsetMinutes.coerceAtLeast(1)
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("📝 任务即将开始")

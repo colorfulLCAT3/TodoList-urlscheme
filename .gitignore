@@ -50,3 +50,11 @@ data/*.db
 # 构建/无关文件
 RinUI/
 runtime-x86_64
+
+# Android
+android_native/.gradle/
+android_native/build/
+android_native/app/build/
+android_native/local.properties
+android_native/.idea/
+android_native/.kotlin/

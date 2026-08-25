@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="./asset/todo_icon.ico" type="image/x-icon">
+    <title>Todo List App</title>
+    <style>
+        /* 骨架屏样式 */
+        .skeleton-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-primary);
+            z-index: 9998;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-md);
+        }
+
+        .skeleton-container {
+            width: 100%;
+            max-width: 1400px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-lg);
+        }
+
+        .skeleton-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-lg);
+            background-color: var(--bg-secondary);
+            border-radius: var(--border-radius);
+        }
+
+        .skeleton-title {
+            width: 150px;
+            height: 24px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius-sm);
+            animation: skeleton-loading 1.5s ease-in-out infinite;
+        }
+
+        .skeleton-settings {
+            width: 32px;
+            height: 32px;
+            background-color: var(--bg-tertiary);
+            border-radius: 50%;
+            animation: skeleton-loading 1.5s ease-in-out infinite 0.2s;
+        }
+
+        .skeleton-stats {
+            padding: var(--spacing-lg);
+            background-color: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .skeleton-stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .skeleton-stat-label {
+            width: 80px;
+            height: 16px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius-sm);
+            animation: skeleton-loading 1.5s ease-in-out infinite 0.3s;
+        }
+
+        .skeleton-stat-value {
+            width: 60px;
+            height: 20px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius-sm);
+            animation: skeleton-loading 1.5s ease-in-out infinite 0.4s;
+        }
+
+        .skeleton-categories {
+            padding: var(--spacing-lg);
+            background-color: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .skeleton-category-title {
+            width: 100px;
+            height: 20px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius-sm);
+            animation: skeleton-loading 1.5s ease-in-out infinite 0.5s;
+        }
+
+        .skeleton-category-item {
+            width: 100%;
+            height: 40px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius-sm);
+            animation: skeleton-loading 1.5s ease-in-out infinite 0.6s;
+        }
+
+        .skeleton-add-category {
+            width: 100%;
+            height: 40px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius-sm);
+            animation: skeleton-loading 1.5s ease-in-out infinite 0.7s;
+        }
+
+        .skeleton-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .skeleton-search {
+            height: 40px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius-sm);
+            animation: skeleton-loading 1.5s ease-in-out infinite 0.8s;
+        }
+
+        .skeleton-filters {
+            height: 40px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius-sm);
+            animation: skeleton-loading 1.5s ease-in-out infinite 0.9s;
+        }
+
+        .skeleton-task-list {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .skeleton-task-item {
+            height: 80px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius);
+            animation: skeleton-loading 1.5s ease-in-out infinite 1s;
+        }
+
+        .skeleton-footer {
+            padding: var(--spacing-md);
+            background-color: var(--bg-secondary);
+            border-radius: var(--border-radius);
+        }
+
+        .skeleton-contact {
+            width: 100%;
+            height: 40px;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--border-radius);
+            animation: skeleton-loading 1.5s ease-in-out infinite 1.1s;
+        }
+
+        @keyframes skeleton-loading {
+            0% {
+                background-color: var(--bg-tertiary);
+            }
+            50% {
+                background-color: var(--border-color);
+            }
+            100% {
+                background-color: var(--bg-tertiary);
+            }
+        }
+
+        /* 响应式骨架屏 */
+        @media (max-width: 768px) {
+            .skeleton-container {
+                gap: var(--spacing-md);
+            }
+
+            .skeleton-header,
+            .skeleton-stats,
+            .skeleton-categories {
+                padding: var(--spacing-md);
+            }
+
+            .skeleton-task-item {
+                height: 60px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .skeleton-screen {
+                padding: var(--spacing-sm);
+            }
+
+            .skeleton-header,
+            .skeleton-stats,
+            .skeleton-categories {
+                padding: var(--spacing-sm);
+            }
+
+            .skeleton-title {
+                width: 120px;
+            }
+
+            .skeleton-task-item {
+                height: 50px;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="css/global.css">
+    <link rel="stylesheet" href="css/media.css">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/dark-mode.css">
+    <link rel="stylesheet" href="css/pikaday.css">
+</head>
+<body>
+<!-- 骨架屏 -->
+<div id="skeleton-screen" class="skeleton-screen">
+    <div class="skeleton-container">
+        <div class="skeleton-header">
+            <div class="skeleton-title"></div>
+            <div class="skeleton-settings"></div>
+        </div>
+        <div class="skeleton-stats">
+            <div class="skeleton-stat-item">
+                <div class="skeleton-stat-label"></div>
+                <div class="skeleton-stat-value"></div>
+            </div>
+            <div class="skeleton-stat-item">
+                <div class="skeleton-stat-label"></div>
+                <div class="skeleton-stat-value"></div>
+            </div>
+            <div class="skeleton-stat-item">
+                <div class="skeleton-stat-label"></div>
+                <div class="skeleton-stat-value"></div>
+            </div>
+            <div class="skeleton-stat-item">
+                <div class="skeleton-stat-label"></div>
+                <div class="skeleton-stat-value"></div>
+            </div>
+        </div>
+        <div class="skeleton-categories">
+            <div class="skeleton-category-title"></div>
+            <div class="skeleton-category-item"></div>
+            <div class="skeleton-category-item"></div>
+            <div class="skeleton-category-item"></div>
+            <div class="skeleton-category-item"></div>
+            <div class="skeleton-add-category"></div>
+        </div>
+        <div class="skeleton-main">
+            <div class="skeleton-search"></div>
+            <div class="skeleton-filters"></div>
+            <div class="skeleton-task-list">
+                <div class="skeleton-task-item"></div>
+                <div class="skeleton-task-item"></div>
+                <div class="skeleton-task-item"></div>
+                <div class="skeleton-task-item"></div>
+                <div class="skeleton-task-item"></div>
+            </div>
+        </div>
+        <div class="skeleton-footer">
+            <div class="skeleton-contact"></div>
+        </div>
+    </div>
+</div>
+
+<div class="app-container">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1 class="app-title">📝 Todo List</h1>
+            <div class="sidebar-header-actions">
+                <button id="settings-btn" class="btn btn--colorless btn--font-size-lg" title="设置中心">⚙️</button>
+            </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="stats-container">
+            <!-- 统计日期范围显示 -->
+            <div class="stats-date-range" id="stats-date-range">
+                <span class="date-range-text">全部时间</span>
+            </div>
+            <!-- 统计数据 -->
+            <div class="stats-data">
+                <div class="stat-item">
+                    <span class="stat-label">未完成</span>
+                    <span id="total-uncompleted-tasks" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">今日已完成</span>
+                    <span id="today-completed-tasks" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">完成率</span>
+                    <span id="completion-rate" class="stat-value">0%</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">已过期</span>
+                    <span id="over-due-date-tasks" class="stat-value">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分类管理 -->
+        <div class="categories-section">
+            <div class="categories-section-header">
+                <span class="categories-section-title">分类</span>
+                <span class="categories-more" id="categories-more">展示更多</span>
+            </div>
+            <div class="category-list" id="category-list">
+                <button class="btn btn--colorless btn--width-100 category-item-btn active" id="all-category-item" data-category="all">
+                    <span>📋全部</span>
+                    <span class="category-count">0</span>
+                </button>
+            </div>
+            <button id="add-category-btn" class="btn btn--border-dashed btn--width-100">+ 添加分类</button>
+        </div>
+
+        <div class="tags-section" id="tags-section">
+            <span>
+                <span id="show-tags">
+                    <svg id="show-less-tags" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="16"
+                     height="16" style="display: none;"><path
+                        d="M245.312 845.888l244.672-244.672a32 32 0 0 1 45.248 0l244.736 244.672a16 16 0 0 1 0 22.592l-22.656 22.656a16 16 0 0 1-19.2 2.56l-3.456-2.56-222.08-222.08-222.016 222.08a16 16 0 0 1-19.2 2.56l-3.392-2.56-22.656-22.656a16 16 0 0 1 0-22.592zM244.672 178.176l244.672 244.672a32 32 0 0 0 45.312 0l244.672-244.672a16 16 0 0 0 0-22.656l-22.656-22.592a16 16 0 0 0-19.2-2.56l-3.392 2.56L512 355.008l-222.08-222.08a16 16 0 0 0-19.2-2.56l-3.392 2.56-22.656 22.592a16 16 0 0 0 0 22.656z"
+                        fill="#007bff"></path></svg>
+                    <svg id="show-more-tags" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="16"
+                         height="16" style="display: block;"><path
+                            d="M245.312 642.176l244.672 244.672a32 32 0 0 0 45.248 0l244.736-244.672a16 16 0 0 0 0-22.656l-22.656-22.592a16 16 0 0 0-19.2-2.56l-3.456 2.56-222.08 222.08-222.016-222.08a16 16 0 0 0-19.2-2.56l-3.392 2.56-22.656 22.592a16 16 0 0 0 0 22.656zM244.672 381.888l244.672-244.672a32 32 0 0 1 45.312 0l244.672 244.672a16 16 0 0 1 0 22.592l-22.656 22.656a16 16 0 0 1-19.2 2.56l-3.392-2.56L512 205.056l-222.08 222.08a16 16 0 0 1-19.2 2.56l-3.392-2.56-22.656-22.656a16 16 0 0 1 0-22.592z"
+                            fill="#007bff"></path></svg>
+                    <span id="tags-text">标签</span>：
+                </span>
+                <span class="tags-list" id="tags-list"></span>
+            </span>
+        </div>
+
+        <!-- 开源项目说明 -->
+        <div class="contact-author-section">
+            <span class="open-source-note">基于 todolist 开源项目，修改者：HXH&ZJY</span>
+        </div>
+
+    </aside>
+
+    <!-- 移动端遮罩层 -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+        <!-- 顶部操作栏 -->
+        <header class="app-header">
+            <!-- 移动端菜单按钮 -->
+            <button id="mobile-menu-btn" class="btn btn--colorless btn--font-size-lg">☰</button>
+            <!-- 小屏幕更多按钮 -->
+            <button id="more-menu-btn" class="btn btn--colorless btn--font-size-lg" title="更多选项">︰</button>
+            <div class="search-container">
+                <div class="search-input-wrapper search-tag-wrapper" id="search-tag-wrapper">
+                    <input type="text" id="search-input" class="search-input" autocomplete="off">
+                    <button type="button" id="search-clear-btn" class="btn btn--colorless btn--font-size-lg" title="清空搜索">×</button>
+                </div>
+                <button id="search-btn" class="btn">🔍</button>
+            </div>
+
+            <div class="action-buttons">
+                <select id="view-toggle-select" class="view-filter" title="切换视图，日历视图不显示无开始日期数据">
+                    <option value="list">📋 列表视图</option>
+                    <option value="calendar">📅 日历视图</option>
+                    <option value="timeline">⌛ 时间轴视图</option>
+                </select>
+
+                <select id="priority-filter" class="priority-filter">
+                    <option value="all">所有优先级</option>
+                    <option value="high">🔴 高优先级</option>
+                    <option value="medium">🟡 中优先级</option>
+                    <option value="low">🟢 低优先级</option>
+                    <option value="none">⚪ 无优先级</option>
+                </select>
+
+                <select id="status-filter" class="status-filter">
+                    <option value="all">所有状态</option>
+                    <option value="completed">已完成</option>
+                    <option value="uncompleted" selected>未完成</option>
+                    <option value="pending">未完成未逾期</option>
+                    <option value="overdue">未完成已过期</option>
+                </select>
+
+                <select id="due-date-filter" class="due-date-filter">
+                    <option value="all">所有时间</option>
+                    <option value="today">今天</option>
+                    <option value="tomorrow">明天</option>
+                    <option value="week">本周内</option>
+                    <option value="month">本月内</option>
+                    <option value="no-due-date">无开始日期</option>
+                </select>
+
+                <button id="add-task-btn" class="btn btn--primary-color btn--padding-md desktop-only">+ 新建任务</button>
+                <button id="export-tasks-btn" class="btn btn--success-color btn--padding-md desktop-only">📥 导出任务</button>
+            </div>
+        </header>
+
+        <!-- 移动端悬浮按钮 -->
+        <button id="add-task-fab" class="btn btn--primary-color btn--circle mobile-only" title="新建任务">
+            <span class="fab-icon">+</span>
+        </button>
+
+        <!-- 任务列表-内容主体 -->
+        <div class="tasks-container" id="tasks-view">
+            <div id="tasks-list" class="tasks-list">
+                <!-- 任务项将通过JavaScript动态添加 -->
+            </div>
+
+            <div id="empty-state" class="empty-state" style="display: none;">
+                <div class="empty-icon">📝</div>
+                <h3>暂无任务</h3>
+                <p>点击"新建任务"按钮创建你的第一个任务</p>
+            </div>
+        </div>
+
+        <!-- 任务列表-分页组件 -->
+        <div id="pagination" class="pagination desktop-only">
+            <div class="pagination-info">
+                <span id="pagination-showing">显示 0-0 共 0 条</span>
+                <select id="page-size-select" class="page-size-select">
+                    <option value="10">10条/页</option>
+                    <option value="20">20条/页</option>
+                    <option value="50">50条/页</option>
+                    <option value="100">100条/页</option>
+                </select>
+            </div>
+            <div class="pagination-controls">
+                <button id="pagination-first" class="btn" disabled>首页</button>
+                <button id="pagination-prev" class="btn" disabled>上一页</button>
+                <div id="pagination-numbers" class="pagination-numbers">
+                    <!-- 页码按钮将动态生成 -->
+                </div>
+                <button id="pagination-next" class="btn" disabled>下一页</button>
+                <button id="pagination-last" class="btn" disabled>末页</button>
+            </div>
+        </div>
+
+        <!-- 日历视图 -->
+        <div class="calendar-container" id="calendar-view" style="display: none;">
+            <div class="calendar-background-month" id="calendar-background-month">1</div>
+            <div class="calendar-prev-month" id="prev-month">◀</div>
+            <div class="calendar-main-content">
+                <div class="calendar-weekdays">
+                    <div class="calendar-weekday">日</div>
+                    <div class="calendar-weekday">一</div>
+                    <div class="calendar-weekday">二</div>
+                    <div class="calendar-weekday">三</div>
+                    <div class="calendar-weekday">四</div>
+                    <div class="calendar-weekday">五</div>
+                    <div class="calendar-weekday">六</div>
+                </div>
+                <div id="calendar-days" class="calendar-days">
+                    <!-- 日历日期将通过JavaScript动态添加 -->
+                </div>
+            </div>
+            <div class="calendar-next-month" id="next-month">▶</div>
+        </div>
+
+        <div class="task-scheduler" id="timeline-view" style="display: none;">
+            <div class="toolbar">
+                <div class="date-controls">
+                    <button id="prevWeekBtn" class="btn btn--circle" title="上一周">←</button>
+                    <span id="dateRangeLabel" class="date-range-label">加载中...</span>
+                    <button id="nextWeekBtn" class="btn btn--circle" title="下一周">→</button>
+                </div>
+                <div class="week-adjust">
+                    <button id="weekMinusBtn" class="btn" title="减少显示周数">📆 -1周</button>
+                    <span id="weekCountIndicator" class="week-indicator">1周</span>
+                    <button id="weekPlusBtn" class="btn" title="增加显示周数">+1周 📆</button>
+                </div>
+            </div>
+            <div class="timeline-container" id="timelineContainer">
+                <div class="timeline-grid" id="timelineGrid"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- 任务创建/编辑模态框 -->
+<div id="task-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-title">新建任务</h2>
+            <button class="btn btn--colorless btn--font-size-lg" id="modal-close">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <form id="task-form" class="task-form">
+                <div class="form-group">
+                    <label for="task-title">任务标题*</label>
+                    <input type="text" id="task-title" required maxlength="100">
+                </div>
+
+                <div class="form-group">
+                    <label for="task-description">任务描述
+                        <span style="color: #666; font-size: 12px;">（可选）</span></label>
+                    <textarea id="task-description" rows="3" maxlength="500"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="tags-selector">标签 <span style="color: #999; font-size: 12px;">（选择或添加标签）</span></label>
+                    <div id="tags-selector" class="tags-selector">
+                        <!-- 标签列表将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-priority">优先级</label>
+                        <select id="task-priority">
+                            <option value="none">⚪ 无</option>
+                            <option value="low">🟢 低</option>
+                            <option value="medium">🟡 中</option>
+                            <option value="high">🔴 高</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="task-category">分类</label>
+                        <select id="task-category">
+                            <option value="">无分类</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 更多选项 -->
+                <div class="more-options-section">
+                    <button type="button" id="more-options-toggle" class="btn btn--colorless">
+                        <span class="toggle-icon">+</span> 更多选项
+                    </button>
+
+                    <div id="more-options-content" class="more-options-content" style="display: none;">
+                        <div class="form-group">
+                            <label for="task-parent">父任务 <span style="color: #666; font-size: 12px;">可选</span></label>
+                            <div class="parent-task-combobox" id="parent-task-combobox">
+                                <input type="text" id="task-parent-input" placeholder="点击选择或输入搜索未完成的任务" autocomplete="off">
+                                <input type="hidden" id="task-parent" value="">
+                                <div class="combobox-dropdown" id="parent-task-dropdown">
+                                    <div class="combobox-loading" style="display: none;">加载中...</div>
+                                    <div class="combobox-results"></div>
+                                    <div class="combobox-load-more" style="display: none;">
+                                        <button type="button" class="btn" id="load-more-btn">加载更多</button>
+                                    </div>
+                                    <div class="combobox-empty" style="display: none;">无匹配任务</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group datetime-group">
+                            <label>开始日期和时间 <span
+                                    style="color: #666; font-size: 12px;">（可选）</span></label>
+                            <div class="datetime-inputs">
+                                <div class="input-wrapper">
+                                    <input type="text" id="task-due-date-picker" class="picker-input"
+                                           placeholder="YYYY-MM-DD" readonly>
+                                    <button type="button" class="btn btn--colorless btn--font-size-lg" id="clear-date" title="清空日期">×</button>
+                                </div>
+                                <div class="input-wrapper">
+                                    <input type="time" id="task-due-time" class="time-input">
+                                    <button type="button" class="btn btn--colorless btn--font-size-lg" id="clear-time" title="清空时间">×</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <label for="is-recurring" class="recurrence-toggle">
+                            <span id="recurrence-toggle" class="recurrence-toggle">创建为周期性任务</span>
+                            <input type="checkbox" id="is-recurring">
+                        </label>
+                        <div id="recurring-options" class="recurring-options" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="recurrence-type">重复周期</label>
+                                    <select id="recurrence-type">
+                                        <option value="">请选择</option>
+                                        <option value="daily">每天</option>
+                                        <option value="weekly">按周</option>
+                                        <option value="monthly">按月</option>
+                                        <option value="yearly">按年</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="recurrence-count">循环次数*</label>
+                                    <input type="number" id="recurrence-count" min="1" max="999"
+                                           placeholder="循环次数不能为空" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" id="cancel-btn" class="btn btn--tertiary-color btn--padding-md">取消</button>
+            <button type="submit" form="task-form" id="save-btn" class="btn btn--primary-color btn--padding-md">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 分类创建模态框 -->
+<div id="category-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="category-modal-title">新建分类</h2>
+            <button class="btn btn--colorless btn--font-size-lg" id="category-modal-close">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <form id="category-form" class="category-form">
+                <div class="form-group">
+                    <label for="category-name">分类名称 *</label>
+                    <input type="text" id="category-name" required maxlength="20">
+                </div>
+
+                <div class="form-group">
+                    <label for="category-color">颜色</label>
+                    <div class="color-picker">
+                        <input type="color" id="category-color" value="#007bff">
+                        <div class="color-presets">
+                            <button type="button" data-color="#007bff" style="background: #007bff;"></button>
+                            <button type="button" data-color="#28a745" style="background: #28a745;"></button>
+                            <button type="button" data-color="#dc3545" style="background: #dc3545;"></button>
+                            <button type="button" data-color="#ffc107" style="background: #ffc107;"></button>
+                            <button type="button" data-color="#6f42c1" style="background: #6f42c1;"></button>
+                            <button type="button" data-color="#fd7e14" style="background: #fd7e14;"></button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" id="category-cancel-btn" class="btn btn--tertiary-color btn--padding-md">取消</button>
+            <button type="submit" form="category-form" id="category-save-btn" class="btn btn--primary-color btn--padding-md">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 确认对话框模态框 -->
+<div id="confirm-dialog" class="modal">
+    <div class="modal-content confirm-dialog-content">
+        <div class="modal-header">
+            <h2>确认操作</h2>
+        </div>
+        <div class="modal-body">
+            <p id="confirm-message"></p>
+        </div>
+        <div class="modal-footer">
+            <button id="confirm-cancel" class="btn btn--tertiary-color btn--width-100">取消</button>
+            <button id="confirm-ok" class="btn btn--danger-color btn--width-100">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 设置中心模态框 -->
+<div id="settings-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>设置中心</h2>
+            <button class="btn btn--colorless btn--font-size-lg" id="settings-close">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <div class="setting-section">
+                <h3>通用设置</h3>
+                <!-- 窗口置顶设置 -->
+                <div class="setting-item mobile-unshown-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">📌</span>
+                        <span class="setting-text">窗口置顶</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="window-top-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <!-- 主题设置 -->
+                <div class="setting-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">🌙</span>
+                        <span class="setting-text">深色模式</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="theme-dark-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <!-- 语言设置 -->
+                <div class="setting-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">🅰️</span>
+                        <span class="setting-text">语言切换</span>
+                    </div>
+                    <label class="switch language-switch">
+                        <input type="checkbox" id="language-toggle">
+                        <span class="slider"></span>
+                        <span class="language-indicator" id="language-indicator">中</span>
+                    </label>
+                </div>
+                
+                <!-- 开机启动设置 -->
+                <div class="setting-item mobile-unshown-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">🚀</span>
+                        <span class="setting-text">开机启动</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="auto-start-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- 提前提醒设置 -->
+                <div class="setting-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">⏰</span>
+                        <span class="setting-text">提前提醒</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="remind-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-item-config remind-offset-config">
+                    <div class="config-item">
+                        <label class="data-label">提醒时间点(分钟)</label>
+                        <input type="text" id="remind-offsets-input" class="setting-config-text" value="30,10,5" placeholder="逗号分隔，如 30,10,5">
+                        <button id="remind-offsets-apply" class="btn btn--primary-color setting-config-btn">应用</button>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="setting-section">
+                <h3>数据管理</h3>
+                <!-- 数据目录配置 -->
+                <div class="setting-item-config mobile-unshown-item data-storage">
+                    <div class="config-item">
+                        <label class="data-label">存储路径</label>
+                        <button id="data-dir-btn" class="setting-config-text">浏览</button>
+                        <button id="apply-dir-btn" class="btn btn--primary-color setting-config-btn">应用</button>
+                    </div>
+                </div>
+                <!-- 数据同步管理 -->
+                <div class="setting-item" id="data-sync-btn">
+                    <div class="setting-label">
+                        <span class="setting-icon">💾</span>
+                        <span class="setting-text">同步数据</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-section">
+                <h3>关于</h3>
+                <!-- 仓库地址 -->
+                <div class="setting-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">🔗</span>
+                        <span class="setting-text">源码地址</span>
+                    </div>
+                    <a href="https://github.com/TangIsLearning/TodoList" target="_blank" class="external-link"
+                       style="text-decoration: none;">TodoList</a>
+                </div>
+                <!-- 使用说明 -->
+                <div class="setting-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">📃</span>
+                        <span class="setting-text">相关文档</span>
+                    </div>
+                    <a href="https://tangislearning.github.io/TodoList/features.html" target="_blank" class="external-link"
+                       style="text-decoration: none;">TodoList功能介绍</a>
+                </div>
+                <!-- 开源协议 -->
+                <div class="setting-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">💡</span>
+                        <span class="setting-text">开源声明</span>
+                    </div>
+                    <a href="https://github.com/TangIsLearning/TodoList/blob/master/LICENSE" target="_blank"
+                       class="external-link" style="text-decoration: none;">仅供使用，勿商用</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="data-sync-modal" class="modal">
+    <div class="modal-content data-sync-modal-content">
+        <div class="modal-header">
+            <h2>数据同步</h2>
+            <button class="btn btn--colorless btn--font-size-lg" id="data-sync-close">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <div class="setting-section">
+                <!-- WebDAV同步开关 -->
+                <div class="setting-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">☁️</span>
+                        <span class="setting-text">数据同步</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="webdav-enable-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- WebDAV配置面板 -->
+                <div id="webdav-config-panel" class="webdav-config-panel" style="display: none;">
+                    <!-- 同步类型选择 -->
+                    <div class="config-item">
+                        <label class="data-label">同步类型</label>
+                        <select id="webdav-sync-type-selector" name="sync-type" class="webdav-select">
+                            <option value="jianguoyun">坚果云</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+
+                    <!-- URL输入框 -->
+                    <div class="config-item">
+                        <label class="data-label">地址*</label>
+                        <input type="text" id="webdav-url" class="webdav-input" placeholder="请输入WebDAV服务器地址">
+                    </div>
+
+                    <div class="config-item">
+                        <label class="data-label">账号*</label>
+                        <input type="email" id="webdav-username" class="webdav-input" placeholder="请输入邮箱地址">
+                    </div>
+
+                    <div class="config-item">
+                        <label class="data-label">密码*</label>
+                        <input type="password" id="webdav-password" class="webdav-input" placeholder="请输入授权应用密码">
+                    </div>
+
+                    <div class="config-item">
+                        <label class="data-label">路径*</label>
+                        <input id="webdav-remote-path" class="webdav-input" placeholder="请输入远程文件路径">
+                    </div>
+
+                    <div class="config-item">
+                        <label class="data-label">首次同步</label>
+                        <select id="webdav-first-sync-mode" class="webdav-select">
+                            <option value="remote_overwrite">远程覆盖本地</option>
+                            <option value="local_overwrite">本地覆盖远程</option>
+                        </select>
+                    </div>
+
+                    <div class="edit-notice">⚠️ 首次同步外的数据自动同步规则：存在数据更新的端点，15s内会自动同步数据到其他端点</div>
+
+                    <div class="webdav-actions">
+                        <button id="webdav-test-btn" class="btn btn--tertiary-color btn--width-100">测试连接</button>
+                        <button id="webdav-save-btn" class="btn btn--primary-color btn--width-100">保存配置</button>
+                    </div>
+
+                    <div id="webdav-status" class="webdav-status" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 导出任务模态框 -->
+<div id="export-modal" class="modal">
+    <div class="modal-content export-modal-content">
+        <div class="modal-header">
+            <h2>导出任务</h2>
+            <button class="btn btn--colorless btn--font-size-lg" id="export-modal-close">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <div class="export-form">
+                <!-- 优先级筛选 -->
+                <div class="form-group">
+                    <label for="export-priority">优先级</label>
+                    <select id="export-priority">
+                        <option value="all">全部</option>
+                        <option value="high">高</option>
+                        <option value="medium">中</option>
+                        <option value="low">低</option>
+                        <option value="none">无</option>
+                    </select>
+                </div>
+
+                <!-- 完成状态筛选 -->
+                <div class="form-group">
+                    <label for="export-status">完成状态</label>
+                    <select id="export-status">
+                        <option value="all">全部</option>
+                        <option value="completed">已完成</option>
+                        <option value="uncompleted">未完成</option>
+                    </select>
+                </div>
+
+                <!-- 年份筛选 -->
+                <div class="form-group">
+                    <label for="export-year">开始年份</label>
+                    <select id="export-year">
+                        <option value="">全部年份</option>
+                    </select>
+                </div>
+
+                <!-- 月份筛选 -->
+                <div class="form-group">
+                    <label for="export-month">开始月份</label>
+                    <select id="export-month">
+                        <option value="">全部月份</option>
+                        <option value="1">1月</option>
+                        <option value="2">2月</option>
+                        <option value="3">3月</option>
+                        <option value="4">4月</option>
+                        <option value="5">5月</option>
+                        <option value="6">6月</option>
+                        <option value="7">7月</option>
+                        <option value="8">8月</option>
+                        <option value="9">9月</option>
+                        <option value="10">10月</option>
+                        <option value="11">11月</option>
+                        <option value="12">12月</option>
+                    </select>
+                </div>
+
+                <!-- 分类筛选 -->
+                <div class="form-group">
+                    <label for="export-category">分类</label>
+                    <select id="export-category">
+                        <option value="all">全部分类</option>
+                    </select>
+                </div>
+
+                <!-- 标签筛选 -->
+                <div class="form-group">
+                    <label for="export-tags">标签</label>
+                    <div id="export-tags-container" class="tags-checkbox-list">
+                        <!-- 标签将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+
+                <div class="export-actions">
+                    <button id="export-cancel-btn" class="btn btn--tertiary-color btn--width-100">取消</button>
+                    <button id="export-confirm-btn" class="btn btn--primary-color btn--width-100">导出Excel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 小屏幕更多菜单弹窗 -->
+<div id="more-menu-modal" class="more-menu-modal">
+    <div class="more-menu-content">
+        <div class="more-menu-header">
+            <h3 class="more-menu-title">更多选项</h3>
+            <button id="more-menu-close" class="btn btn--colorless btn--font-size-lg">×</button>
+        </div>
+        <ul class="more-menu-list">
+            <li class="more-menu-item">
+                <a href="#" class="more-menu-link" data-action="calendar-view">
+                    <span class="more-menu-icon" id="more-menu-view-icon">📅</span>
+                    <span class="more-menu-text" id="more-menu-view-text">切换日历视图</span>
+                </a>
+            </li>
+            <li class="group-divider"></li> <!-- 分割线 -->
+            <li class="more-menu-item">
+                <a href="#" class="more-menu-link" data-action="filter-all">
+                    <span class="more-menu-icon">📜</span>
+                    <span class="more-menu-text">显示所有任务</span>
+                </a>
+            </li>
+            <li class="more-menu-item">
+                <a href="#" class="more-menu-link" data-action="filter-uncompleted">
+                    <span class="more-menu-icon">⏳</span>
+                    <span class="more-menu-text">显示未完成任务</span>
+                </a>
+            </li>
+            <li class="more-menu-item">
+                <a href="#" class="more-menu-link" data-action="filter-overdue">
+                    <span class="more-menu-icon">⚠️</span>
+                    <span class="more-menu-text">显示已过期任务</span>
+                </a>
+            </li>
+            <li class="more-menu-item">
+                <a href="#" class="more-menu-link" data-action="filter-today">
+                    <span class="more-menu-icon">☀️</span>
+                    <span class="more-menu-text">仅显示今天任务</span>
+                </a>
+            </li>
+            <li class="more-menu-item">
+                <a href="#" class="more-menu-link" data-action="filter-tag">
+                    <span class="more-menu-icon">🏷️</span>
+                    <span class="more-menu-text">显示含标签任务</span>
+                </a>
+            </li>
+            <li class="group-divider" style="display: none;" id="filter-group-divider"></li> <!-- 分割线 -->
+            <li class="more-menu-item" style="display: none;" id="filter-prev-month">
+                <a href="#" class="more-menu-link" data-action="filter-prev-month">
+                    <span class="more-menu-icon">◀️</span>
+                    <span class="more-menu-text">上一个月任务</span>
+                </a>
+            </li>
+            <li class="more-menu-item" style="display: none;" id="filter-next-month">
+                <a href="#" class="more-menu-link" data-action="filter-next-month">
+                    <span class="more-menu-icon">▶️</span>
+                    <span class="more-menu-text">下一个月任务</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- 加载提示 -->
+<div id="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>加载中...</p>
+</div>
+
+<!-- JavaScript文件 -->
+<!-- Android 原生 WebView：localStorage 后端 shim（在业务 JS 之前加载） -->
+<script src="shim/localstorage_backend.js"></script>
+<script>
+// 页面加载前先显示骨架屏
+document.addEventListener('DOMContentLoaded', () => {
+    // 显示骨架屏
+    const skeletonScreen = document.getElementById('skeleton-screen');
+    if (skeletonScreen) {
+        skeletonScreen.style.display = 'flex';
+    }
+});
+</script>
+<script src="js/logger.js"></script>
+<script src="config/languages.js"></script>
+<script src="js/pikaday.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/business-utils.js"></script>
+<script src="js/language.js"></script>
+<script src="js/todo.js"></script>
+<script src="js/category.js"></script>
+<script src="js/calendar.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/main.js"></script>
+<script src="js/timeline.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+/* 深色主题 */
+[data-theme="dark"] {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #404040;
+    --bg-dark: #343a40;
+    --bg-darker: #212529;
+
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --text-muted: #808080;
+
+    --border-color: #404040;
+    --shadow: 0 2px 8px rgba(0,0,0,0.3);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+[data-theme="dark"] .modal-content {
+    background-color: var(--bg-darker);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .task-item {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .task-item.completed {
+    background-color: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .task-checkbox {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group textarea,
+[data-theme="dark"] .form-group select {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .color-presets button {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .category-edit-btn:hover,
+[data-theme="dark"] .category-delete-btn:hover {
+    box-shadow: 0 0 8px rgba(255,255,255,0.2);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+    background-color: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .language-switch:not(.checked) .language-indicator {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .language-switch.checked .language-indicator {
+    color: white;
+}
+
+[data-theme="dark"] .btn {
+    --text-color: var(--text-white);
+}

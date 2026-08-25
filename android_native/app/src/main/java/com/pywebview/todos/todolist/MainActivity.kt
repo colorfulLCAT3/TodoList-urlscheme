@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -38,6 +39,7 @@ class MainActivity : AppCompatActivity() {
     private val prevRemaining = mutableMapOf<String, Double>()
 
     companion object {
+        private const val TAG = "TodoReminder"
         private const val CHANNEL_ID = "todo_reminder"
         private const val NOTIFICATION_PERMISSION = 1001
     }
@@ -177,14 +179,25 @@ class MainActivity : AppCompatActivity() {
                         override fun onReceiveValue(value: String?) {
                             if (value == null || value == "null" || value == "\"null\"") return
                             try {
-                                val obj = JSONObject(value.trim())
-                                if (obj.optString("enabled", "true") == "false") return
+                                // evaluateJavascript 对字符串返回值会整体加引号转义，先解开
+                                val raw = value.trim()
+                                val jsonStr = if (raw.startsWith("\"") && raw.endsWith("\"") && raw.length >= 2) {
+                                    JSONObject("{\"v\":" + raw + "}").getString("v")
+                                } else {
+                                    raw
+                                }
+                                val obj = JSONObject(jsonStr)
+                                if (obj.optString("enabled", "true") == "false") {
+                                    Log.d(TAG, "提醒已关闭，跳过")
+                                    return
+                                }
                                 val offsets = parseOffsets(obj.optString("offsets", "30,10,5"))
                                 if (offsets.isEmpty()) return
 
                                 val tasks = obj.getJSONArray("tasks")
                                 val now = System.currentTimeMillis()
                                 val minOffset = offsets.min()
+                                Log.d(TAG, "扫描: ${tasks.length()} 任务, offsets=$offsets")
 
                                 for (i in 0 until tasks.length()) {
                                     val task = tasks.getJSONObject(i)
@@ -209,6 +222,7 @@ class MainActivity : AppCompatActivity() {
                                             val key = id + "_" + minOffset
                                             if (!notifiedTaskIds.contains(key)) {
                                                 notifiedTaskIds.add(key)
+                                                Log.d(TAG, "补发最小档 $minOffset 分钟: ${task.optString("title")}")
                                                 showReminder(task.optString("title", "任务"), minOffset)
                                             }
                                         }
@@ -219,6 +233,7 @@ class MainActivity : AppCompatActivity() {
                                             if (notifiedTaskIds.contains(key)) continue
                                             if (remainMin <= offset && offset < prev) {
                                                 notifiedTaskIds.add(key)
+                                                Log.d(TAG, "触发 $offset 分钟档: ${task.optString("title")}")
                                                 showReminder(task.optString("title", "任务"), offset)
                                             }
                                         }
@@ -226,7 +241,7 @@ class MainActivity : AppCompatActivity() {
                                     prevRemaining[id] = remainMin
                                 }
                             } catch (e: Exception) {
-                                // 解析失败忽略
+                                Log.e(TAG, "提醒解析失败: ${e.message}", e)
                             }
                         }
                     }

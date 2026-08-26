@@ -577,13 +577,7 @@ class TodoManager {
     // 将 {原文} 渲染为可展开的折叠块：未展开显示"原文...点击展开"，点击展开完整内容
     _collapseBlock(content) {
         const full = this._attrEscape(content.replace(/\s+/g, ' ').trim());
-        return `<span class="desc-collapse" data-full="${full}">
-            <span class="desc-collapse-head">
-                <span class="desc-collapse-label">原文</span>
-                <span class="desc-collapse-ellipsis">...</span>
-                <span class="desc-collapse-toggle">点击展开</span>
-            </span>
-        </span>`;
+        return `<span class="desc-collapse" data-full="${full}"><span class="desc-collapse-head"><span class="desc-collapse-label">原文</span><span class="desc-collapse-ellipsis">...</span><span class="desc-collapse-toggle">点击展开</span></span></span>`;
     }
 
     _attrEscape(s) {

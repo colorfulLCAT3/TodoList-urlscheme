@@ -1165,6 +1165,17 @@ input:checked + .slider:before {
     font-size: 0.9em;
     vertical-align: baseline;
     user-select: none;
+    white-space: nowrap; /* 原文...点击展开 强制一行 */
+}
+
+.desc-collapse-label,
+.desc-collapse-ellipsis,
+.desc-collapse-toggle {
+    display: inline;
+}
+
+.desc-collapse-head {
+    white-space: nowrap;
 }
 
 .desc-collapse:hover {

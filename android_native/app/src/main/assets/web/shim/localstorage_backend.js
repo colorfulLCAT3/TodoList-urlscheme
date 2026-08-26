@@ -453,6 +453,18 @@
     api.getTags = api.get_all_tags;
 
     // ---------- URL scheme 推送桥 ----------
+
+    // 协议字段名（蛇形 due_date/category_id）转内部驼峰（dueDate/categoryId），与 Windows 端一致
+    function normalizeSchemeTask(raw) {
+        var out = {};
+        Object.keys(raw).forEach(function (k) {
+            out[k] = raw[k];
+        });
+        if (out.dueDate === undefined && raw.due_date !== undefined) out.dueDate = String(raw.due_date);
+        if (out.categoryId === undefined && raw.category_id !== undefined) out.categoryId = raw.category_id;
+        return out;
+    }
+
     window.__pushFromUrl = function (url) {
         try {
             var parsed = new URL(url);
@@ -464,7 +476,7 @@
             var added = 0;
             list.forEach(function (raw) {
                 if (!raw || !raw.title) return;
-                api.add_todo(raw);
+                api.add_todo(normalizeSchemeTask(raw));
                 added++;
             });
 

@@ -565,12 +565,65 @@ class TodoManager {
         await this.bindTaskEvents();
     }
     
-    // 格式化任务备注：先转义防注入，再支持 **粗体** 与换行
+    // 格式化任务备注：先转义防注入，再支持 **粗体**、换行与 {折叠块}
     _formatDescription(desc) {
         if (!desc) return '';
         return Utils.escapeHtml(desc)
             .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\{([^{}]*)\}/g, (m, content) => this._collapseBlock(content))
             .replace(/\n/g, '<br>');
+    }
+
+    // 将 {原文} 渲染为可展开的折叠块：未展开显示前 40 字 + "点击展开"
+    _collapseBlock(content) {
+        const trimmed = content.replace(/\s+/g, ' ').trim();
+        const MAX = 40;
+        if (trimmed.length <= MAX) {
+            return `<span class="desc-collapse" data-full="${this._attrEscape(trimmed)}">${this._attrEscape(trimmed)}</span>`;
+        }
+        const preview = trimmed.slice(0, MAX);
+        return `<span class="desc-collapse" data-full="${this._attrEscape(trimmed)}" title="点击展开">
+            <span class="desc-collapse-preview">${this._attrEscape(preview)}…</span>
+            <span class="desc-collapse-toggle">点击展开</span>
+        </span>`;
+    }
+
+    _attrEscape(s) {
+        return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // 折叠块点击展开/收起（全局委托，幂等注册一次）
+    bindCollapseEvents() {
+        if (this._collapseBound) return;
+        this._collapseBound = true;
+        document.addEventListener('click', (e) => {
+            const block = e.target.closest('.desc-collapse');
+            if (!block) return;
+            const full = block.getAttribute('data-full');
+            if (!full) return;
+            const preview = block.querySelector('.desc-collapse-preview');
+            const toggle = block.querySelector('.desc-collapse-toggle');
+            let fullEl = block.querySelector('.desc-collapse-full');
+            if (block.classList.contains('expanded')) {
+                // 收起
+                block.classList.remove('expanded');
+                if (preview) preview.style.display = '';
+                if (toggle) toggle.style.display = '';
+                if (fullEl) fullEl.remove();
+            } else {
+                // 展开：注入完整原文
+                block.classList.add('expanded');
+                if (preview) preview.style.display = 'none';
+                if (toggle) toggle.style.display = 'none';
+                if (!fullEl) {
+                    fullEl = document.createElement('span');
+                    fullEl.className = 'desc-collapse-full';
+                    fullEl.textContent = full;
+                    block.appendChild(fullEl);
+                }
+            }
+            e.stopPropagation();
+        });
     }
 
     // 创建任务元素
@@ -683,6 +736,8 @@ class TodoManager {
     
     // 绑定任务事件
     async bindTaskEvents() {
+        this.bindCollapseEvents();
+
         // 复选框点击
         document.querySelectorAll('.task-checkbox').forEach(checkbox => {
             checkbox.onclick = (e) => {
@@ -1352,6 +1407,7 @@ class TodoManager {
     
     // 查看任务详情
     async viewTaskDetails(taskId) {
+        this.bindCollapseEvents();
         let task = this.tasks.find(t => t.id === taskId);
 
         // 如果当前页任务中不存在该任务，再查询数据库
@@ -1431,7 +1487,7 @@ class TodoManager {
                         ${task.parentTaskId ? `<span class="recurring-badge">${window.languageManager.getText('recurringTask', '周期任务')}</span>` : ''}
                     </h3>
                     <p style="color: var(--text-secondary); line-height: 1.6;">
-                        ${task.description ? Utils.escapeHtml(task.description).replace(/\n/g, '<br>') : window.languageManager.getText('noTaskDescription', '无描述')}
+                        ${task.description ? this._formatDescription(task.description) : window.languageManager.getText('noTaskDescription', '无描述')}
                     </p>
                 </div>
 

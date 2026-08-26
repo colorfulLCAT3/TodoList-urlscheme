@@ -281,7 +281,7 @@ object ReminderAlarm {
                     if (remainMs >= -60 * 60 * 1000L) {
                         val dueKey = id + "_due"
                         if (dueKey !in notified) {
-                            if (ReminderNotifier.send(ctx, title, 0, isDue = true)) {
+                            if (ReminderNotifier.send(ctx, title, 0, isDue = true, taskId = id)) {
                                 ReminderStore.addNotified(ctx, dueKey)
                             }
                         }
@@ -297,7 +297,7 @@ object ReminderAlarm {
                     val key = id + "_" + offset
                     if (key in notified) break
                     val showMin = Math.round(remainMin).toInt().coerceAtLeast(1)
-                    if (ReminderNotifier.send(ctx, title, showMin)) {
+                    if (ReminderNotifier.send(ctx, title, showMin, taskId = id)) {
                         ReminderStore.addNotified(ctx, key)
                     }
                     break
@@ -329,8 +329,8 @@ object ReminderNotifier {
             ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
 
-    /** minutes<=0 表示到期提醒；返回是否真正发送 */
-    fun send(ctx: Context, title: String, minutes: Int, isDue: Boolean = false, isTest: Boolean = false): Boolean {
+    /** minutes<=0 表示到期提醒；taskId 用于点击通知跳转任务详情。返回是否真正发送 */
+    fun send(ctx: Context, title: String, minutes: Int, isDue: Boolean = false, isTest: Boolean = false, taskId: String? = null): Boolean {
         ensureChannel(ctx)
         val notifTitle = when {
             isTest -> "🔔 测试通知"
@@ -347,12 +347,31 @@ object ReminderNotifier {
             Log.e(TAG, "通知未发送: POST_NOTIFICATIONS 权限未授予！请在系统设置中允许 TodoList 通知")
             return false
         }
+
+        // 点击通知 → 打开 app 并跳转该任务详情
+        val contentIntent = if (!isTest && taskId != null) {
+            PendingIntent.getActivity(
+                ctx, taskId.hashCode() and 0x7FFFFFFF,
+                Intent(ctx, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    .putExtra("openTaskId", taskId),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getActivity(
+                ctx, 0,
+                Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
         val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(notifTitle)
             .setContentText(notifText)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
+            .setContentIntent(contentIntent)
             .build()
         return try {
             val id = when {
@@ -361,7 +380,7 @@ object ReminderNotifier {
                 else -> title.hashCode() and 0xFFFFFF
             }
             NotificationManagerCompat.from(ctx).notify(id, notification)
-            Log.d(TAG, "通知已发送: $notifTitle / $notifText (id=$id)")
+            Log.d(TAG, "通知已发送: $notifTitle / $notifText (id=$id)${if (taskId != null) " openTaskId=$taskId" else ""}")
             true
         } catch (e: SecurityException) {
             Log.e(TAG, "通知发送失败(SecurityException): ${e.message}")

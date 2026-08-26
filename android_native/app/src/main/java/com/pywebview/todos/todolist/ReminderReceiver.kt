@@ -74,7 +74,7 @@ class ReminderReceiver : BroadcastReceiver() {
         }
 
         if (isDue) {
-            if (ReminderNotifier.send(context, title, 0, isDue = true)) {
+            if (ReminderNotifier.send(context, title, 0, isDue = true, taskId = taskId)) {
                 ReminderStore.addNotified(context, key)
                 Log.d("TodoAlarm", "到期提醒已发: $title")
             }
@@ -85,7 +85,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val remainMs = dueMs - now
         val minutes = if (remainMs <= 0) {
             // 闹钟延迟到过期：改发到期提醒，并记录原档位 key 避免重发
-            val sent = ReminderNotifier.send(context, title, 0, isDue = true)
+            val sent = ReminderNotifier.send(context, title, 0, isDue = true, taskId = taskId)
             ReminderStore.addNotified(context, key)
             ReminderStore.addNotified(context, taskId + "_due")
             Log.d("TodoAlarm", "闹钟延迟已过期，改发到期: $title sent=$sent")
@@ -94,7 +94,7 @@ class ReminderReceiver : BroadcastReceiver() {
             Math.round(remainMs / 60000.0).toInt().coerceAtLeast(1)
         }
 
-        if (ReminderNotifier.send(context, title, minutes, isDue = false)) {
+        if (ReminderNotifier.send(context, title, minutes, isDue = false, taskId = taskId)) {
             ReminderStore.addNotified(context, key)
             Log.d("TodoAlarm", "提前提醒已发: $title 剩${minutes}分钟 key=$key")
         }

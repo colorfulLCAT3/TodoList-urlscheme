@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private var pendingUrl: String? = null
+    private var pendingOpenTaskId: String? = null
     private var pageLoaded = false
 
     companion object {
@@ -37,8 +38,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 读取 URL scheme intent（冷启动）
+        // 读取 URL scheme intent（冷启动）与通知点击跳转任务
         pendingUrl = intent?.data?.toString()
+        pendingOpenTaskId = intent?.getStringExtra("openTaskId")
 
         // 允许 chrome://inspect 远程调试 WebView（仅调试构建）
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
@@ -86,6 +88,9 @@ class MainActivity : AppCompatActivity() {
                 // 等页面 JS 就绪后注入待处理的 URL
                 pendingUrl?.let { pushUrlToPage(it) }
                 pendingUrl = null
+                // 通知点击跳转：页面就绪后打开对应任务详情
+                pendingOpenTaskId?.let { openTaskDetail(it) }
+                pendingOpenTaskId = null
             }
         }
 
@@ -100,13 +105,36 @@ class MainActivity : AppCompatActivity() {
         ReminderAlarm.catchUpMissed(this)
     }
 
-    // ---------- URL scheme ----------
+    // ---------- URL scheme & 通知点击 ----------
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         val url = intent.data?.toString()
         if (url != null) {
             pushUrlToPage(url)
+        }
+        val openTaskId = intent.getStringExtra("openTaskId")
+        if (openTaskId != null) {
+            openTaskDetail(openTaskId)
+        }
+    }
+
+    private fun openTaskDetail(taskId: String) {
+        Log.d(TAG, "通知点击跳转任务详情: $taskId")
+        if (!pageLoaded) {
+            pendingOpenTaskId = taskId
+            return
+        }
+        runOnUiThread {
+            try {
+                // 先确保任务加载完成，再打开详情
+                webView.evaluateJavascript(
+                    "window.todoManager && window.todoManager.loadTasks && window.todoManager.loadTasks().then(function(){ window.todoManager.viewTaskDetails('$taskId'); })",
+                    null
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "跳转任务详情失败: ${e.message}")
+            }
         }
     }
 

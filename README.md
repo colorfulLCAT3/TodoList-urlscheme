@@ -4,34 +4,38 @@
 
 ## 📋 项目简介
 
-TodoList是一款真正跨平台的待办事项管理应用，基于Python和Web技术开发，同时支持桌面端（Windows、macOS、Linux）和移动端，提供直观的用户界面和丰富的功能，帮助用户在不同设备上无缝管理个人任务。
+TodoList是一款真正跨平台的待办事项管理应用，基于Python和Web技术开发，同时支持桌面端（Windows）和移动端（Android），提供直观的用户界面和丰富的功能，帮助用户在不同设备上无缝管理个人任务。
+
+本项目基于 [TangStudy 的 TodoList 开源项目](https://github.com/TangIsLearning/TodoList) 二次开发，在保留原有功能的基础上，针对实际使用场景做了大量改进与优化。
 
 ## ✨ 核心功能
 
 ### 基础功能
-- **任务管理**：创建、编辑、删除任务，标记完成/未完成
+- **任务管理**：创建、编辑、删除任务，标记完成/未完成；移动端支持左滑任务查看/编辑/删除
 - **任务分类**：创建分类、为任务添加分类、按分类筛选
 - **优先级管理**：高、中、低、无优先级设置
-- **截止日期**：设置任务截止日期和提醒时间
+- **开始时间**：设置任务开始日期时间，支持按列表/日历/时间轴视图查看
 - **搜索与筛选**：关键词搜索、按状态/日期/标签筛选
 - **统计报表**：任务完成统计和分析
-- **任务提醒**：通过系统通知和桌面图标提醒任务到期（目前仅支持桌面端）
+- **任务提醒**：系统通知提醒，时间点可自定义（如 30/10/5 分钟前），Android 端支持后台准点提醒
+- **备注折叠**：描述中 `{原文}` 包裹的内容折叠显示，点击展开
 
 ### 高级功能
-- **数据共享**：支持局域网内P2P数据共享和接收
+- **URL Scheme 推送**：通过 `todolist://add?data=<json>` 从网页/脚本/其他应用一键推送待办（详见 [url调用方法.md](url调用方法.md)）
 - **响应式设计**：适配不同屏幕尺寸
-- **深色/浅色主题**：保护眼睛，支持系统级主题切换
+- **深色/浅色主题**：保护眼睛，支持主题切换
 - **国际化功能**：支持快速切换语言，目前支持简体中文和英语
 - **桌面端特色功能-窗口置顶**：支持窗口置顶功能
-- **桌面端特色功能-开机自启动功能**：支持配置开机自启动
+- **桌面端特色功能-开机自启动**：支持配置开机自启动
 - **桌面端特色功能-数据自定义存储**：支持自定义配置数据文件存储路径
-- **移动端特色功能-坚果云数据同步**：支持配置坚果云数据同步
+- **移动端特色功能-后台提醒**：使用系统精确闹钟（setAlarmClock），即使应用在后台/锁屏也能准点提醒
+- **移动端特色功能-权限引导**：按手机品牌（ColorOS/MIUI/EMUI/OriginOS 等）自动检测并引导后台运行/自启动权限
 
 ### 支持平台
-- **桌面端**：Windows、macOS、Linux
-- **移动端**：Android、 iOS
+- **桌面端**：Windows
+- **移动端**：Android
 
-*\*说明：理论上支持macOS、Linux和iOS，但是由于开发者无相关设备或环境，无法测试，请自行测试。*
+*\*说明：原项目理论上支持 macOS、Linux 和 iOS，但当前维护者仅在 Windows 与 Android 上测试，其余平台请自行验证。*
 
 ## 🚀 快速开始
 
@@ -44,8 +48,8 @@ TodoList是一款真正跨平台的待办事项管理应用，基于Python和Web
 
 **安装步骤**：
 ```bash
-# 1. 克隆项目（如果从仓库）
-git clone <repository-url>
+# 1. 克隆项目
+git clone https://github.com/colorfulLCAT3/TodoList-urlscheme.git
 cd TodoList
 
 # 2. 安装Python依赖
@@ -58,7 +62,7 @@ python main.py
 python build.py
 ```
 
-*\*说明：build脚本使用默认图标，可以通过scripts/utils/create_icon.py生成自定义图标置于根目录即可自动打包到exe中。*
+*\*说明：构建脚本使用默认图标，可通过 `scripts/utils/create_icon.py` 生成自定义图标置于根目录即可自动打包到 exe 中。*
 
 #### 安卓移动端安装
 
@@ -68,28 +72,31 @@ python build.py
 3. 安装下载的APK文件
 4. 打开应用开始使用
 
-**方式二：手动构建APK**
+**方式二：使用 Android Studio 构建**
 
-> ⚠️ **注意**：该部分已更改，现在使用Android Studio构建，下文弃用，可直接在AS open项目文件夹完成构建
+> ⚠️ **注意**：当前 Android 端使用 **Android Studio 原生工程**（`android_native/`），已弃用 Buildozer / python-for-android 方案。可直接用 Android Studio 打开 `android_native/` 文件夹完成构建。
 
 **环境要求**：
-- Python >= 3.10.9
-- Buildozer
-- Android SDK和NDK
+- Android Studio（含 Android SDK）
+- JDK 17+
+- Gradle 8.14.3（工程自带 wrapper）
 
 **构建步骤**：
 ```bash
-# 1. 安装Buildozer
-pip install buildozer
-
-# 2. 构建APK（项目根目录已提供 buildozer.spec，含 URL Scheme / 通知权限等配置）
-buildozer android debug
-
-# 3. 安装APK到设备
-buildozer android deploy run
+# 1. 用 Android Studio 打开 android_native/ 目录
+# 2. 等待 Gradle 同步完成
+# 3. 点击 Run ▶ 或构建 APK
 ```
 
-*\*说明：`buildozer.spec` 已放在项目根目录（由 `scripts/config/buildozer.spec` 同步），内部配置了自定义 URL Scheme（`todolist://`）、通知权限（`POST_NOTIFICATIONS`）、pywebview Android 库等，无需再执行 `buildozer init`。*
+或使用命令行：
+```bash
+cd android_native
+./gradlew assembleDebug   # Windows 下为 gradlew.bat assembleDebug
+```
+
+**APK 产物**：`android_native/app/build/outputs/apk/debug/app-debug.apk`
+
+*\*说明：Android 端通过 `assets/web/` 下的前端 + `shim/localstorage_backend.js` 在原生 WebView 中运行，数据存于 localStorage，无需 Python 后端。*
 
 ## 🔧 技术栈
 
@@ -97,25 +104,29 @@ buildozer android deploy run
 - **桌面框架**：Python + PyWebView
 - **后端**：Python 3.10.9+
 - **数据库**：SQLite（本地存储）
-- **构建工具**：Buildozer(用于构建安卓应用) + PyInstaller(用于桌面构建)
+- **Android**：Android Studio（Kotlin + WebView）+ localStorage shim
+- **构建工具**：PyInstaller(桌面构建) + Gradle(Android 构建)
 
 ## 📁 项目结构
 
 ```
 TodoList/
-├── backend/           # 后端API和数据库操作
-├── frontend/          # 前端界面和交互逻辑
-├── data/             # 数据库文件
-├── docs/             # 项目文档资料
-├── scripts/          # 脚本归档
-├── TodoList.spec     # PyInstaller配置文件（用于桌面构建）
-├── build.py          # 桌面端应用构建脚本
-├── main.py           # 桌面端应用启动脚本
-├── requirements.txt  # 项目所需的依赖包
-└── README.md         # 项目说明
+├── backend/            # 后端API和数据库操作
+├── frontend/           # 前端界面和交互逻辑
+├── android_native/     # Android Studio 原生工程（WebView + localStorage shim）
+├── data/               # 数据库文件
+├── docs/               # 项目文档资料
+├── scripts/            # 脚本归档
+├── tests/              # 测试（含 URL scheme 测试页）
+├── TodoList.spec       # PyInstaller配置文件（用于桌面构建）
+├── build.py            # 桌面端应用构建脚本
+├── main.py             # 桌面端应用启动脚本
+├── requirements.txt    # 项目所需的依赖包
+├── url调用方法.md       # URL Scheme 推送调用说明
+└── README.md           # 项目说明
 ```
 
-*\*说明：启动项目核心仅需要backend目录、frontend目录和main.py即可。*
+*\*说明：启动桌面端核心仅需要 backend 目录、frontend 目录和 main.py；Android 端使用 android_native 目录。*
 
 ## 🛠️ 故障排除
 
@@ -126,14 +137,15 @@ TodoList/
    - 检查Python版本是否 >= 3.10.9
    - 确认依赖包已安装: `pip install pywebview`
 
-2. **数据同步失败**
+2. **URL Scheme 无法唤起**
+   - 确认已至少启动过一次应用（用于注册协议）
+   - 检查注册表 `HKCU\Software\Classes\todolist` 是否存在
+   - 尝试在命令行执行 `start todolist://add?data=...`
+
+3. **数据同步失败**
    - 确保设备在同一局域网
    - 检查防火墙设置
    - 确认目标设备已启动共享
-
-3. **防火墙配置失败**
-   - 以管理员身份运行应用
-   - 或手动添加防火墙规则
 
 4. **数据库错误**
    - 检查data目录是否存在且可写
@@ -146,20 +158,19 @@ TodoList/
    - 检查设备存储空间是否充足
    - 尝试下载最新版本的APK
 
-2. **应用崩溃**
+2. **后台提醒不生效**
+   - 在「设置 → 权限申请」中完成通知/电池优化授权
+   - 按手机品牌引导开启自启动（OPPO/realme 等系统会冻结后台应用）
+   - 使用「设置 → 调试模式 → 发送测试闹钟」验证提醒链路
+
+3. **应用崩溃**
    - 清理应用缓存
    - 检查安卓系统版本是否兼容
    - 尝试重新安装应用
 
-3. **数据同步失败**
-   - 确保移动设备和桌面设备在同一局域网
-   - 检查移动设备的网络权限
-   - 确认桌面端已启动共享服务
-
 4. **构建APK失败**
-   - 确保安装了完整的Android SDK和NDK
-   - 检查Buildozer配置文件
-   - 尝试使用最新版本的Buildozer
+   - 确认 Android Studio / Gradle 环境正确
+   - 参考 [构建配置](android_native/README.md)（如有）或查看 Gradle 日志
 
 ## 🤝 贡献指南
 
@@ -172,10 +183,11 @@ TodoList/
 ## 📄 许可证
 
 本项目采用 GPLv3 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+原项目版权归 [TangStudy](https://github.com/TangIsLearning/TodoList) 所有，本项目在 GPLv3 协议下对其进行了二次开发。
 
 ## 📞 联系方式
 
 如有问题或建议，请通过以下方式联系：
-- 提交 Issue
-- 邮件联系：tangstudy@foxmail.com
-- 微信公众号留言：[微信公众号](/docs/wechat.jpg)
+- 提交 [Issue](https://github.com/colorfulLCAT3/TodoList-urlscheme/issues)
+- 邮件联系：colorfulLCAThsfx@gmail.com
+- 作者：colorfulLCAT

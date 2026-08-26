@@ -27,7 +27,10 @@ class CalendarManager {
 
     // 切换视图
     async toggleView(event) {
-        const viewToggleSelect = event.target.value;
+        // 视图值来源：优先 event.target.value（桌面 select），否则读 select 当前值
+        // （移动端更多菜单点击传入的 event 是 click 事件，没有 value）
+        const viewToggleEl = document.getElementById('view-toggle-select');
+        const viewToggleSelect = (event && event.target && event.target.value) || (viewToggleEl && viewToggleEl.value) || 'list';
         const tasksView = document.getElementById('tasks-view');
         const pagination = document.getElementById('pagination');
         const calendarView = document.getElementById('calendar-view');
@@ -39,6 +42,9 @@ class CalendarManager {
         const moreMenuIcon = document.getElementById('more-menu-view-icon');
         const moreMenuText = document.getElementById('more-menu-view-text');
         let filterPageSize;
+
+        // 同步下拉框值，保证视图状态一致（移动端更多菜单切换时 select 可能未更新）
+        if (viewToggleEl) viewToggleEl.value = viewToggleSelect;
 
         switch (viewToggleSelect) {
             // 切换到日历视图
@@ -282,9 +288,8 @@ class CalendarManager {
     getTasksForDate(dateStr) {
         return this.tasks.filter(task => {
             if (!task.dueDate) return false;
-            
-            // 提取日期部分（忽略时间）
-            const taskDate = task.dueDate.split('T')[0];
+            // 提取日期部分：兼容 "YYYY-MM-DDTHH:MM"（T 分隔）与 "YYYY-MM-DD HH:MM"（空格分隔）
+            const taskDate = String(task.dueDate).split(/[T ]/)[0];
             return taskDate === dateStr;
         });
     }

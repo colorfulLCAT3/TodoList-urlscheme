@@ -37,23 +37,28 @@ class SettingsUIManager {
         this.remindOffsetsApply = null;
 
         // 调试模式相关元素
-        this.debugModeToggle = null;
-        this.debugPanel = null;
+        // 调试模式相关元素
         this.sendTestNotificationBtn = null;
         this.sendTestAlarmBtn = null;
         this.getDebugInfoBtn = null;
         this.debugInfoOutput = null;
 
-        // 精确闹钟权限元素
-        this.exactAlarmItem = null;
-        this.exactAlarmStatus = null;
-        this.grantExactAlarmBtn = null;
+        // 权限申请 / 调试 弹窗入口
+        this.permissionEntry = null;
+        this.debugEntry = null;
+        this.permissionModal = null;
+        this.debugModal = null;
 
-        // 后台运行权限元素
-        this.backgroundItem = null;
-        this.batteryOptStatus = null;
-        this.ignoreBatteryBtn = null;
-        this.autoStartBtn = null;
+        // 权限弹窗元素
+        this.permNotifStatus = null;
+        this.permExactStatus = null;
+        this.permBatteryStatus = null;
+        this.permGrantNotifBtn = null;
+        this.permGrantExactBtn = null;
+        this.permGrantBatteryBtn = null;
+        this.permGrantAutoStartBtn = null;
+        this.permBrandName = null;
+        this.permBrandGuide = null;
 
         // 延迟初始化
         setTimeout(() => this.init(), 100);
@@ -110,24 +115,32 @@ class SettingsUIManager {
         this.remindOffsetsInput = document.getElementById('remind-offsets-input');
         this.remindOffsetsApply = document.getElementById('remind-offsets-apply');
 
-        // 调试模式元素
-        this.debugModeToggle = document.getElementById('debug-mode-toggle');
-        this.debugPanel = document.getElementById('debug-panel');
+        // 调试模式元素（位于 debug-modal）
         this.sendTestNotificationBtn = document.getElementById('send-test-notification');
         this.sendTestAlarmBtn = document.getElementById('send-test-alarm');
         this.getDebugInfoBtn = document.getElementById('get-debug-info');
         this.debugInfoOutput = document.getElementById('debug-info-output');
 
-        // 精确闹钟权限元素
-        this.exactAlarmItem = document.getElementById('exact-alarm-item');
-        this.exactAlarmStatus = document.getElementById('exact-alarm-status');
-        this.grantExactAlarmBtn = document.getElementById('grant-exact-alarm-btn');
+        // 权限申请 / 调试 弹窗入口（位于 settings-modal）
+        this.permissionEntry = document.getElementById('permission-entry-item');
+        this.debugEntry = document.getElementById('debug-entry-item');
 
-        // 后台运行权限元素
-        this.backgroundItem = document.getElementById('background-item');
-        this.batteryOptStatus = document.getElementById('battery-optimization-status');
-        this.ignoreBatteryBtn = document.getElementById('ignore-battery-btn');
-        this.autoStartBtn = document.getElementById('auto-start-btn');
+        // 权限弹窗
+        this.permissionModal = document.getElementById('permission-modal');
+        this.permissionModalClose = document.getElementById('permission-modal-close');
+        this.permNotifStatus = document.getElementById('perm-notification-status');
+        this.permExactStatus = document.getElementById('perm-exact-status');
+        this.permBatteryStatus = document.getElementById('perm-battery-status');
+        this.permGrantNotifBtn = document.getElementById('perm-grant-notification');
+        this.permGrantExactBtn = document.getElementById('perm-grant-exact');
+        this.permGrantBatteryBtn = document.getElementById('perm-grant-battery');
+        this.permGrantAutoStartBtn = document.getElementById('perm-grant-autostart');
+        this.permBrandName = document.getElementById('perm-brand-name');
+        this.permBrandGuide = document.getElementById('perm-brand-guide');
+
+        // 调试弹窗
+        this.debugModal = document.getElementById('debug-modal');
+        this.debugModalClose = document.getElementById('debug-modal-close');
     }
     
     bindEvents() {
@@ -178,18 +191,28 @@ class SettingsUIManager {
         this.remindToggle?.addEventListener('change', () => this.toggleRemind());
         this.remindOffsetsApply?.addEventListener('click', () => this.applyRemindOffsets());
 
-        // 调试模式事件绑定
-        this.debugModeToggle?.addEventListener('change', () => this.toggleDebugMode());
+        // 权限申请 / 调试 弹窗入口
+        this.permissionEntry?.addEventListener('click', () => this.openPermissionModal());
+        this.debugEntry?.addEventListener('click', () => this.openDebugModal());
+
+        // 权限弹窗事件
+        this.permissionModalClose?.addEventListener('click', () => this.closePermissionModal());
+        this.permissionModal?.addEventListener('click', (e) => {
+            if (e.target === this.permissionModal) this.closePermissionModal();
+        });
+        this.permGrantNotifBtn?.addEventListener('click', () => this.openAppNotificationSettings());
+        this.permGrantExactBtn?.addEventListener('click', () => this.grantExactAlarmPermission());
+        this.permGrantBatteryBtn?.addEventListener('click', () => this.requestIgnoreBattery());
+        this.permGrantAutoStartBtn?.addEventListener('click', () => this.openBrandAutoStart());
+
+        // 调试弹窗事件
+        this.debugModalClose?.addEventListener('click', () => this.closeDebugModal());
+        this.debugModal?.addEventListener('click', (e) => {
+            if (e.target === this.debugModal) this.closeDebugModal();
+        });
         this.sendTestNotificationBtn?.addEventListener('click', () => this.sendTestNotification());
         this.sendTestAlarmBtn?.addEventListener('click', () => this.sendTestAlarm());
         this.getDebugInfoBtn?.addEventListener('click', () => this.getDebugInfo());
-
-        // 精确闹钟权限事件
-        this.grantExactAlarmBtn?.addEventListener('click', () => this.grantExactAlarmPermission());
-
-        // 后台运行权限事件
-        this.ignoreBatteryBtn?.addEventListener('click', () => this.requestIgnoreBattery());
-        this.autoStartBtn?.addEventListener('click', () => this.openAutoStart());
 
         // ESC键关闭
         document.addEventListener('keydown', (e) => {
@@ -232,15 +255,6 @@ class SettingsUIManager {
 
         // 更新提前提醒状态
         this.updateRemindState();
-
-        // 初始化调试模式区（Android 原生端）
-        this.initDebugSection();
-
-        // 更新精确闹钟权限状态（Android 原生端）
-        this.updateExactAlarmState();
-
-        // 更新后台运行权限状态（ColorOS 防冻结）
-        this.updateBackgroundState();
     }
 
     // 更新语言状态
@@ -535,25 +549,111 @@ class SettingsUIManager {
         });
     }
 
-    // ---------- 精确闹钟权限（Android 原生端） ----------
+    // ---------- 权限申请弹窗 ----------
 
-    // 检查并展示闹钟权限状态；无原生桥时隐藏整个区域
-    updateExactAlarmState() {
-        const hasNative = typeof window.TodoNative !== 'undefined';
-        if (this.exactAlarmItem) this.exactAlarmItem.style.display = hasNative ? '' : 'none';
-        if (!hasNative) return;
+    // 打开权限申请弹窗并刷新各权限状态
+    async openPermissionModal() {
+        if (!this.permissionModal) return;
+        this.permissionModal.style.display = 'flex';
+        this.permissionModal.classList.add('show');
+        await this.refreshPermissionStatus();
+    }
 
-        const canExact = !!window.TodoNative.canScheduleExactAlarms && window.TodoNative.canScheduleExactAlarms();
-        if (this.exactAlarmStatus) {
-            this.exactAlarmStatus.textContent = canExact ? '已授予 ✅' : '未授予 ⚠️';
-            this.exactAlarmStatus.style.color = canExact ? 'var(--success-color, #28a745)' : 'var(--danger-color, #dc3545)';
+    closePermissionModal() {
+        if (this.permissionModal) {
+            this.permissionModal.style.display = 'none';
+            this.permissionModal.classList.remove('show');
         }
-        if (this.grantExactAlarmBtn) this.grantExactAlarmBtn.style.display = canExact ? 'none' : '';
+    }
+
+    // 刷新权限弹窗里所有状态（通知/精确闹钟/电池优化 + 品牌引导）
+    async refreshPermissionStatus() {
+        const hasNative = typeof window.TodoNative !== 'undefined';
+        const set = (el, text, ok) => {
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = ok ? 'var(--success-color, #28a745)' : 'var(--danger-color, #dc3545)';
+        };
+
+        // 通知权限
+        let notifOk = false;
+        if (hasNative && window.TodoNative.getNativeDebugInfo) {
+            try {
+                const info = JSON.parse(window.TodoNative.getNativeDebugInfo());
+                notifOk = !!info.hasNotificationPermission;
+                set(this.permNotifStatus, notifOk ? '已授予 ✅' : '未授予 ⚠️', notifOk);
+            } catch (e) {
+                set(this.permNotifStatus, '未知', false);
+            }
+        } else {
+            set(this.permNotifStatus, '非原生端', true);
+        }
+
+        // 精确闹钟
+        let exactOk = false;
+        if (hasNative && window.TodoNative.canScheduleExactAlarms) {
+            exactOk = !!window.TodoNative.canScheduleExactAlarms();
+            set(this.permExactStatus, exactOk ? '已授予 ✅' : '未授予 ⚠️', exactOk);
+        } else {
+            set(this.permExactStatus, '非原生端', true);
+        }
+
+        // 电池优化豁免
+        let batteryOk = false;
+        if (hasNative && window.TodoNative.isIgnoringBatteryOptimizations) {
+            batteryOk = !!window.TodoNative.isIgnoringBatteryOptimizations();
+            set(this.permBatteryStatus, batteryOk ? '已豁免 ✅' : '未豁免 ⚠️ 后台提醒可能延迟', batteryOk);
+        } else {
+            set(this.permBatteryStatus, '非原生端', true);
+        }
+
+        // 品牌引导
+        this.renderBrandGuide(hasNative);
+    }
+
+    // 按设备品牌显示差异化的自启动/后台运行引导
+    renderBrandGuide(hasNative) {
+        if (!this.permBrandName || !this.permBrandGuide) return;
+        if (!hasNative || !window.TodoNative.getBrandInfo) {
+            this.permBrandName.textContent = '未知设备';
+            this.permBrandGuide.textContent = '仅 Android 原生端可查看品牌专属设置引导';
+            return;
+        }
+
+        let rom = '通用/其他';
+        try {
+            const info = JSON.parse(window.TodoNative.getBrandInfo());
+            rom = info.romLabel || '通用/其他';
+        } catch (e) { /* ignore */ }
+
+        this.permBrandName.textContent = rom;
+
+        const guides = {
+            'ColorOS/realme': 'OPPO/realme 会冻结后台应用导致提醒延迟。请点击下方按钮进入自启动管理，允许 TodoList 自启动；并在系统设置中允许后台运行。',
+            'MIUI': '小米/MIUI 有「自启动管理」和「省电策略」。请允许 TodoList 自启动，并将省电策略设为「无限制」。',
+            'EMUI/HarmonyOS': '华为/荣耀 有「自启动管理」和「后台活动限制」。请允许 TodoList 自启动，并在应用启动管理中允许后台活动。',
+            'OriginOS/vivo': 'vivo 有「自启动管理」和「后台高耗电」。请允许 TodoList 自启动，并允许后台高耗电运行。',
+            '一加/OPPO': '一加有「自启动管理」。请允许 TodoList 自启动，避免后台被清理。',
+            '通用/其他': '部分系统会冻结后台应用。请允许 TodoList 自启动、关闭电池优化，并允许后台运行。'
+        };
+        this.permBrandGuide.textContent = guides[rom] || guides['通用/其他'];
+    }
+
+    // ---------- 权限跳转 ----------
+
+    // 跳应用通知设置
+    openAppNotificationSettings() {
+        console.log('[TodoDebug] 点击「去开启通知」');
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.openAppNotificationSettings) {
+            window.TodoNative.openAppNotificationSettings();
+        } else {
+            Utils.showToast('仅 Android 原生端可用', 'warning');
+        }
     }
 
     // 跳系统设置授予精确闹钟权限
     grantExactAlarmPermission() {
-        console.log('[TodoDebug] 点击「去授权」');
+        console.log('[TodoDebug] 点击「去开启精确闹钟」');
         if (typeof window.TodoNative !== 'undefined' && window.TodoNative.openExactAlarmSettings) {
             window.TodoNative.openExactAlarmSettings();
         } else {
@@ -561,27 +661,9 @@ class SettingsUIManager {
         }
     }
 
-    // ---------- 后台运行权限（ColorOS/realme 防冻结） ----------
-
-    // 检查电池优化豁免状态；无原生桥时隐藏整个区域
-    updateBackgroundState() {
-        const hasNative = typeof window.TodoNative !== 'undefined';
-        if (this.backgroundItem) this.backgroundItem.style.display = hasNative ? '' : 'none';
-        if (!hasNative) return;
-
-        let ignoring = false;
-        if (window.TodoNative.isIgnoringBatteryOptimizations) {
-            ignoring = !!window.TodoNative.isIgnoringBatteryOptimizations();
-        }
-        if (this.batteryOptStatus) {
-            this.batteryOptStatus.textContent = ignoring ? '已允许 ✅' : '未允许 ⚠️ 后台提醒可能延迟';
-            this.batteryOptStatus.style.color = ignoring ? 'var(--success-color, #28a745)' : 'var(--danger-color, #dc3545)';
-        }
-    }
-
-    // 跳系统"忽略电池优化"设置
+    // 跳系统"忽略电池优化"设置（电池优化关闭跳转）
     requestIgnoreBattery() {
-        console.log('[TodoDebug] 点击「允许后台运行」');
+        console.log('[TodoDebug] 点击「关闭电池优化」');
         if (typeof window.TodoNative !== 'undefined' && window.TodoNative.requestIgnoreBatteryOptimizations) {
             window.TodoNative.requestIgnoreBatteryOptimizations();
         } else {
@@ -589,36 +671,30 @@ class SettingsUIManager {
         }
     }
 
-    // 跳 ColorOS 自启动管理
-    openAutoStart() {
+    // 按品牌跳自启动管理
+    openBrandAutoStart() {
         console.log('[TodoDebug] 点击「自启动设置」');
-        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.openAutoStartSettings) {
-            window.TodoNative.openAutoStartSettings();
+        if (typeof window.TodoNative !== 'undefined' && window.TodoNative.openBrandAutoStart) {
+            window.TodoNative.openBrandAutoStart();
         } else {
             Utils.showToast('仅 Android 原生端可用', 'warning');
         }
     }
 
-    // ---------- 调试模式（Android 原生端） ----------
+    // ---------- 调试弹窗 ----------
 
-    // 初始化调试区：原生桥存在才显示；恢复开关与面板状态
-    initDebugSection() {
-        const hasNative = typeof window.TodoNative !== 'undefined';
-        const item = document.getElementById('debug-mode-item');
-        if (item) item.style.display = hasNative ? '' : 'none';
-        if (!hasNative) return;
-
-        const on = localStorage.getItem('todolist_debug_mode') === 'true';
-        if (this.debugModeToggle) this.debugModeToggle.checked = on;
-        if (this.debugPanel) this.debugPanel.style.display = on ? 'block' : 'none';
+    // 打开调试弹窗
+    async openDebugModal() {
+        if (!this.debugModal) return;
+        this.debugModal.style.display = 'flex';
+        this.debugModal.classList.add('show');
     }
 
-    // 切换调试模式开关
-    toggleDebugMode() {
-        const on = !!this.debugModeToggle?.checked;
-        localStorage.setItem('todolist_debug_mode', on.toString());
-        if (this.debugPanel) this.debugPanel.style.display = on ? 'block' : 'none';
-        console.log(`[TodoDebug] 调试模式已${on ? '开启' : '关闭'}`);
+    closeDebugModal() {
+        if (this.debugModal) {
+            this.debugModal.style.display = 'none';
+            this.debugModal.classList.remove('show');
+        }
     }
 
     // 发送测试通知（调用原生桥，直接验证通知通道/权限）

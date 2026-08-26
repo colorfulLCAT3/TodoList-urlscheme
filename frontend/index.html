@@ -742,54 +742,22 @@
                     </div>
                 </div>
 
-                <!-- 精确闹钟权限（Android 原生端，后台提醒稳定性） -->
-                <div class="setting-item-config" id="exact-alarm-item" style="display: none;">
-                    <div class="config-item">
-                        <label class="data-label">后台提醒（精确闹钟）</label>
-                        <span id="exact-alarm-status" class="data-label">检查中...</span>
-                        <button id="grant-exact-alarm-btn" class="btn btn--primary-color setting-config-btn" style="display: none;">去授权</button>
+                <!-- 权限申请入口 -->
+                <div class="setting-item" id="permission-entry-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">🔐</span>
+                        <span class="setting-text">权限申请</span>
                     </div>
-                    <div class="config-item" style="color: var(--text-secondary); font-size: 12px;">
-                        授予后，即使应用在后台/锁屏，任务提醒也会准点弹出。
-                    </div>
+                    <span class="setting-value">›</span>
                 </div>
 
-                <!-- 后台运行权限（ColorOS/realme 后台冻结的根源） -->
-                <div class="setting-item-config" id="background-item" style="display: none;">
-                    <div class="config-item">
-                        <label class="data-label">后台运行（防冻结）</label>
-                        <span id="battery-optimization-status" class="data-label">检查中...</span>
-                    </div>
-                    <div class="config-item">
-                        <button id="ignore-battery-btn" class="btn btn--primary-color setting-config-btn">允许后台运行</button>
-                        <button id="auto-start-btn" class="btn btn--tertiary-color setting-config-btn">自启动设置</button>
-                    </div>
-                    <div class="config-item" style="color: var(--text-secondary); font-size: 12px;">
-                        ColorOS/realme 会冻结后台应用导致提醒延迟。请开启"允许后台运行"，并在"自启动设置"中允许 TodoList。
-                    </div>
-                </div>
-
-                <!-- 调试模式（Android 原生端可用） -->
-                <div class="setting-item" id="debug-mode-item">
+                <!-- 调试模式入口 -->
+                <div class="setting-item" id="debug-entry-item">
                     <div class="setting-label">
                         <span class="setting-icon">🐞</span>
                         <span class="setting-text">调试模式</span>
                     </div>
-                    <label class="switch">
-                        <input type="checkbox" id="debug-mode-toggle">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="setting-item-config" id="debug-panel" style="display: none;">
-                    <div class="config-item">
-                        <button id="send-test-notification" class="btn btn--primary-color setting-config-btn">发送测试通知</button>
-                        <button id="send-test-alarm" class="btn btn--warning-color setting-config-btn">发送测试闹钟</button>
-                        <button id="get-debug-info" class="btn btn--tertiary-color setting-config-btn">查看调试信息</button>
-                    </div>
-                    <div class="config-item">
-                        <label class="data-label">调试信息</label>
-                        <pre id="debug-info-output" style="font-size: 11px; white-space: pre-wrap; word-break: break-all; background: var(--bg-tertiary); padding: 8px; border-radius: 6px; max-height: 200px; overflow: auto; margin: 0;"></pre>
-                    </div>
+                    <span class="setting-value">›</span>
                 </div>
 
             </div>
@@ -841,6 +809,78 @@
                     </div>
                     <a href="https://github.com/TangIsLearning/TodoList/blob/master/LICENSE" target="_blank"
                        class="external-link" style="text-decoration: none;">仅供使用，勿商用</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 权限申请弹窗 -->
+<div id="permission-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>权限申请</h2>
+            <button class="btn btn--colorless btn--font-size-lg" id="permission-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="setting-section">
+                <h3>提醒相关权限</h3>
+                <div class="permission-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">🔔</span>
+                        <span class="setting-text">通知权限</span>
+                    </div>
+                    <span id="perm-notification-status" class="permission-status">检查中...</span>
+                </div>
+                <div class="permission-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">⏰</span>
+                        <span class="setting-text">精确闹钟</span>
+                    </div>
+                    <span id="perm-exact-status" class="permission-status">检查中...</span>
+                </div>
+                <div class="permission-item">
+                    <div class="setting-label">
+                        <span class="setting-icon">🔋</span>
+                        <span class="setting-text">电池优化</span>
+                    </div>
+                    <span id="perm-battery-status" class="permission-status">检查中...</span>
+                </div>
+                <div class="permission-actions">
+                    <button id="perm-grant-notification" class="btn btn--primary-color setting-config-btn">去开启通知</button>
+                    <button id="perm-grant-exact" class="btn btn--primary-color setting-config-btn">去开启精确闹钟</button>
+                    <button id="perm-grant-battery" class="btn btn--primary-color setting-config-btn">关闭电池优化</button>
+                </div>
+            </div>
+
+            <div class="setting-section" id="perm-brand-section">
+                <h3>后台运行（<span id="perm-brand-name">检测中...</span>）</h3>
+                <p id="perm-brand-guide" class="permission-guide">检测设备中...</p>
+                <div class="permission-actions">
+                    <button id="perm-grant-autostart" class="btn btn--primary-color setting-config-btn">自启动设置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 调试模式弹窗 -->
+<div id="debug-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>调试模式</h2>
+            <button class="btn btn--colorless btn--font-size-lg" id="debug-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="setting-section">
+                <div class="config-item">
+                    <button id="send-test-notification" class="btn btn--primary-color setting-config-btn">发送测试通知</button>
+                    <button id="send-test-alarm" class="btn btn--warning-color setting-config-btn">发送测试闹钟</button>
+                    <button id="get-debug-info" class="btn btn--tertiary-color setting-config-btn">查看调试信息</button>
+                </div>
+                <div class="config-item">
+                    <label class="data-label">调试信息</label>
+                    <pre id="debug-info-output" style="font-size: 11px; white-space: pre-wrap; word-break: break-all; background: var(--bg-tertiary); padding: 8px; border-radius: 6px; max-height: 240px; overflow: auto; margin: 0;"></pre>
                 </div>
             </div>
         </div>

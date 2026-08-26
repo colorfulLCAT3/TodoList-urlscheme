@@ -155,6 +155,23 @@ class MainActivity : AppCompatActivity() {
             (getSystemService(Context.ALARM_SERVICE) as AlarmManager).canScheduleExactAlarms()
     }
 
+    /** 检测国内 ROM：用于权限申请页展示差异化自启动引导 */
+    private fun detectRom(): String {
+        val m = (Build.MANUFACTURER ?: "").lowercase()
+        val b = (Build.BRAND ?: "").lowercase()
+        val model = (Build.MODEL ?: "").lowercase()
+        val f = (Build.FINGERPRINT ?: "").lowercase()
+
+        return when {
+            m.contains("oppo") || m.contains("realme") || b.contains("oppo") || b.contains("realme") || f.contains("coloros") -> "ColorOS/realme"
+            m.contains("xiaomi") || b.contains("xiaomi") || b.contains("redmi") || f.contains("miui") -> "MIUI"
+            m.contains("huawei") || m.contains("honor") || b.contains("huawei") || b.contains("honor") || f.contains("emui") || f.contains("harmonyos") -> "EMUI/HarmonyOS"
+            m.contains("vivo") || m.contains("bbk") || b.contains("vivo") || b.contains("iqoo") || f.contains("originos") -> "OriginOS/vivo"
+            m.contains("oneplus") || b.contains("oneplus") || model.contains("oneplus") -> "一加/OPPO"
+            else -> "通用/其他"
+        }
+    }
+
     // ---------- 原生桥 ----------
     private inner class TodoNative {
         // 前端任务变化时同步到镜像并重排闹钟
@@ -236,23 +253,94 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 跳 ColorOS/realme 自启动管理（后台被冻结时必改这里）
+        // 跳应用通知设置（Android 13+ 权限被拒时引导）
         @JavascriptInterface
-        fun openAutoStartSettings() {
+        fun openAppNotificationSettings() {
             runOnUiThread {
                 try {
-                    startActivity(Intent().apply {
-                        action = "com.coloros.safecenter.permission.startup"
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    })
-                } catch (e: Exception) {
-                    // ColorOS 版本差异，回退到应用详情
-                    try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        startActivity(intent)
+                    } else {
                         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-                    } catch (e2: Exception) {
-                        Log.e(TAG, "打开自启动设置失败: ${e2.message}")
                     }
+                } catch (e: Exception) {
+                    Log.e(TAG, "打开通知设置失败: ${e.message}")
                 }
+            }
+        }
+
+        // 返回设备品牌信息（供前端展示差异化自启动引导）
+        @JavascriptInterface
+        fun getBrandInfo(): String {
+            return try {
+                val info = JSONObject()
+                info.put("manufacturer", Build.MANUFACTURER)
+                info.put("brand", Build.BRAND)
+                info.put("model", Build.MODEL)
+                info.put("romLabel", detectRom())
+                info.toString()
+            } catch (e: Exception) {
+                "{\"error\":\"" + (e.message ?: "unknown") + "\"}"
+            }
+        }
+
+        // 按品牌跳自启动/后台管理设置，失败回退应用详情
+        @JavascriptInterface
+        fun openBrandAutoStart() {
+            runOnUiThread {
+                try {
+                    val intent = when (detectRom()) {
+                        "ColorOS/realme" -> Intent().apply {
+                            action = "com.coloros.safecenter.permission.startup"
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        "MIUI" -> Intent().apply {
+                            action = "miui.intent.action.OP_AUTO_START"
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        "EMUI/HarmonyOS" -> Intent().apply {
+                            component = android.content.ComponentName(
+                                "com.huawei.systemmanager",
+                                "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
+                            )
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        "OriginOS/vivo" -> Intent().apply {
+                            component = android.content.ComponentName(
+                                "com.vivo.permissionmanager",
+                                "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"
+                            )
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        "一加/OPPO" -> Intent().apply {
+                            component = android.content.ComponentName(
+                                "com.oneplus.security",
+                                "com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity"
+                            )
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        else -> null
+                    }
+                    if (intent != null) {
+                        startActivity(intent)
+                        Log.d(TAG, "跳转品牌自启动设置: ${detectRom()}")
+                    } else {
+                        openAppDetails()
+                    }
+                } catch (e: Exception) {
+                    Log.d(TAG, "品牌自启动设置不可用，回退应用详情: ${e.message}")
+                    openAppDetails()
+                }
+            }
+        }
+
+        private fun openAppDetails() {
+            try {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+            } catch (e2: Exception) {
+                Log.e(TAG, "打开应用详情失败: ${e2.message}")
             }
         }
 

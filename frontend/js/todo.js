@@ -574,17 +574,15 @@ class TodoManager {
             .replace(/\n/g, '<br>');
     }
 
-    // 将 {原文} 渲染为可展开的折叠块：未展开显示前 40 字 + "点击展开"
+    // 将 {原文} 渲染为可展开的折叠块：未展开显示"原文...点击展开"，点击展开完整内容
     _collapseBlock(content) {
-        const trimmed = content.replace(/\s+/g, ' ').trim();
-        const MAX = 40;
-        if (trimmed.length <= MAX) {
-            return `<span class="desc-collapse" data-full="${this._attrEscape(trimmed)}">${this._attrEscape(trimmed)}</span>`;
-        }
-        const preview = trimmed.slice(0, MAX);
-        return `<span class="desc-collapse" data-full="${this._attrEscape(trimmed)}" title="点击展开">
-            <span class="desc-collapse-preview">${this._attrEscape(preview)}…</span>
-            <span class="desc-collapse-toggle">点击展开</span>
+        const full = this._attrEscape(content.replace(/\s+/g, ' ').trim());
+        return `<span class="desc-collapse" data-full="${full}">
+            <span class="desc-collapse-head">
+                <span class="desc-collapse-label">原文</span>
+                <span class="desc-collapse-ellipsis">...</span>
+                <span class="desc-collapse-toggle">点击展开</span>
+            </span>
         </span>`;
     }
 
@@ -601,20 +599,17 @@ class TodoManager {
             if (!block) return;
             const full = block.getAttribute('data-full');
             if (!full) return;
-            const preview = block.querySelector('.desc-collapse-preview');
-            const toggle = block.querySelector('.desc-collapse-toggle');
+            const head = block.querySelector('.desc-collapse-head');
             let fullEl = block.querySelector('.desc-collapse-full');
             if (block.classList.contains('expanded')) {
-                // 收起
+                // 收起：恢复"原文...点击展开"
                 block.classList.remove('expanded');
-                if (preview) preview.style.display = '';
-                if (toggle) toggle.style.display = '';
+                if (head) head.style.display = '';
                 if (fullEl) fullEl.remove();
             } else {
-                // 展开：注入完整原文
+                // 展开：隐藏提示，注入完整原文
                 block.classList.add('expanded');
-                if (preview) preview.style.display = 'none';
-                if (toggle) toggle.style.display = 'none';
+                if (head) head.style.display = 'none';
                 if (!fullEl) {
                     fullEl = document.createElement('span');
                     fullEl.className = 'desc-collapse-full';

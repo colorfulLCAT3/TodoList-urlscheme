@@ -1094,10 +1094,13 @@ input:checked + .slider:before {
 .config-item {
     display: flex;
     justify-content: space-between;
+    align-items: stretch;
+    min-width: 0;
 }
 
 .setting-config-text, .webdav-input {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
     padding: var(--spacing-md);
     border: 2px solid transparent;
     background-color: var(--bg-secondary);
@@ -1129,6 +1132,8 @@ input:checked + .slider:before {
     background-color: var(--bg-secondary);
     padding: var(--spacing-md);
     border-radius: var(--border-radius) 0 0 var(--border-radius);
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .setting-item-config .config-item .data-label {
@@ -1142,6 +1147,7 @@ input:checked + .slider:before {
 
 .setting-config-btn {
     width: 80px !important;
+    flex-shrink: 0 !important;
     border-left: none !important;
     padding: var(--spacing-md) !important;
     border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0 !important;

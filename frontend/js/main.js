@@ -308,9 +308,10 @@ class App {
     async handleMoreMenuAction(event, action) {
         switch (action) {
             case 'calendar-view':
-                // 移动端更多菜单：先把 select 值设为 calendar，再走 toggleView
+                // 移动端更多菜单：切换日历/列表视图（当前日历则回列表，否则进日历）
                 const viewToggle = document.getElementById('view-toggle-select');
-                if (viewToggle) viewToggle.value = 'calendar';
+                const nextView = viewToggle && viewToggle.value === 'calendar' ? 'list' : 'calendar';
+                if (viewToggle) viewToggle.value = nextView;
                 await this.toggleView(event);
                 break;
             case 'filter-uncompleted':

@@ -74,7 +74,10 @@ class SettingsUIManager {
             
             // 恢复用户设置
             await this.restoreSettings();
-            
+
+            // 按系统显示入口：权限申请仅 Android 原生端（有 TodoNative 桥）显示
+            this.updateEntryVisibility();
+
             this.isInitialized = true;
         } catch (error) {
             logger.error('Failed to initialize SettingsUIManager:', error);
@@ -546,6 +549,24 @@ class SettingsUIManager {
                 Utils.showToast(`${window.languageManager.getText('settingsRemindApplied', '提醒设置已保存')}, ${window.languageManager.getText('settingsRemindNeedRestart', '请重启应用后生效')}`, 'success');
             },
             onError: (error) => Utils.showToast(window.languageManager.getText('settingsFailed', '设置失败'), 'error')
+        });
+    }
+
+    // ---------- 入口显示（按系统） ----------
+
+    // 权限申请仅 Android 原生端显示（有 TodoNative 桥）；调试入口两端都显示
+    updateEntryVisibility() {
+        const isNative = typeof window.TodoNative !== 'undefined';
+        if (this.permissionEntry) {
+            this.permissionEntry.style.display = isNative ? '' : 'none';
+        }
+        // 调试入口两端都显示
+        if (this.debugEntry) {
+            this.debugEntry.style.display = '';
+        }
+        // 调试页里 Android 专用按钮（测试通知/测试闹钟）仅在原生端显示
+        document.querySelectorAll('.android-only').forEach(el => {
+            el.style.display = isNative ? '' : 'none';
         });
     }
 

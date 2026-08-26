@@ -1217,7 +1217,7 @@ input:checked + .slider:before {
 
 /* 移动端左划引导 */
 .swipe-guide {
-    display: flex;
+    /* display 由 .mobile-only 控制（默认隐藏，≤480px 显示） */
     align-items: center;
     justify-content: center;
     gap: var(--spacing-sm);

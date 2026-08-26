@@ -70,7 +70,7 @@ python build.py
 
 **方式二：手动构建APK**
 
-> ⚠️ **注意**：Buildozer / python-for-android **不支持 Windows**，请在 **Linux 或 macOS** 环境下构建。
+> ⚠️ **注意**：该部分已更改，现在使用Android Studio构建，下文弃用，可直接在AS open项目文件夹完成构建
 
 **环境要求**：
 - Python >= 3.10.9

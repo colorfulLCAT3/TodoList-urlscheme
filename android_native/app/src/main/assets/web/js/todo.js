@@ -816,8 +816,8 @@ class TodoManager {
 
             // 创建事件处理函数
             const dragStartHandler = (e) => {
-                // 如果点击的是操作按钮区域或复选框，不触发拖拽
-                if (e.target.closest('.task-actions') || e.target.closest('.task-checkbox')) return;
+                // 如果点击的是操作按钮区域、复选框或折叠块，不触发拖拽
+                if (e.target.closest('.task-actions') || e.target.closest('.task-checkbox') || e.target.closest('.desc-collapse')) return;
 
                 // 如果当前是打开状态，只关闭但不开始拖拽
                 if (content._isOpen) {
@@ -920,8 +920,8 @@ class TodoManager {
 
             // 点击处理函数
             const clickHandler = (e) => {
-                // 如果点击的是操作按钮区域或复选框，不处理
-                if (e.target.closest('.task-actions') || e.target.closest('.task-checkbox')) return;
+                // 如果点击的是操作按钮区域、复选框或折叠块，不处理（折叠块交给全局委托展开）
+                if (e.target.closest('.task-actions') || e.target.closest('.task-checkbox') || e.target.closest('.desc-collapse')) return;
 
                 // 如果当前是打开状态，阻止点击事件
                 if (content._isOpen) {
